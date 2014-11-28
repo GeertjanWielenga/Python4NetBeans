@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE module_updates PUBLIC "-//NetBeans//DTD Autoupdate Catalog 2.6//EN" "http://www.netbeans.org/dtds/autoupdate-catalog-2_6.dtd">
+<module_updates timestamp="34/10/11/28/11/2014">
+
+
+
+<module codenamebase="org.netbeans.modules.python.console" distribution="org-netbeans-modules-python-console.nbm" downloadsize="6063" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="false" OpenIDE-Module="org.netbeans.modules.python.console" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Module-Dependencies="org.netbeans.modules.projectapi/1 &gt; 1.18, org.netbeans.modules.projectuiapi/1 &gt; 1.31.0.6, org.netbeans.modules.python.core &gt; 1.0, org.openide.awt &gt; 7.2.0.1, org.openide.filesystems &gt; 7.9, org.openide.modules &gt; 7.7, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0, org.openide.windows &gt; 6.23" OpenIDE-Module-Name="PythonConsole" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Specification-Version="1.1"/>
+    
+</module>
+
+<module codenamebase="org.netbeans.modules.python.help" distribution="org-netbeans-modules-python-help.nbm" downloadsize="3143" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="true" OpenIDE-Module="org.netbeans.modules.python.help" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Name="PythonHelp" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Specification-Version="1.0"/>
+    
+</module>
+
+<module codenamebase="org.netbeans.modules.python.testrunner" distribution="org-netbeans-modules-python-testrunner.nbm" downloadsize="3186" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="true" OpenIDE-Module="org.netbeans.modules.python.testrunner" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Name="PythonTestrunner" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Specification-Version="1.0"/>
+    
+</module>
+
+<module codenamebase="org.netbeans.modules.python.qshell" distribution="org-netbeans-modules-python-qshell.nbm" downloadsize="16297" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="true" OpenIDE-Module="org.netbeans.modules.python.qshell" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Module-Dependencies="org.netbeans.lib.terminalemulator = 201408251540, org.netbeans.libs.jna/1 &gt; 1.2, org.netbeans.modules.settings/1 &gt; 1.18, org.openide.awt &gt; 7.5, org.openide.dialogs &gt; 7.10, org.openide.util &gt; 7.21, org.openide.windows &gt; 6.26" OpenIDE-Module-Name="Q-shell integration" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Specification-Version="1.0"/>
+    
+</module>
+
+<module_group name="Infrastructure">
+
+<module codenamebase="org.netbeans.modules.gsfpath.api" distribution="org-netbeans-modules-gsfpath-api.nbm" downloadsize="18250" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="false" OpenIDE-Module="org.netbeans.modules.gsfpath.api/1" OpenIDE-Module-Display-Category="Infrastructure" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Long-Description="APIs for handling paths in the Common Scripting Language Framework" OpenIDE-Module-Module-Dependencies="org.openide.awt &gt; 6.2, org.openide.dialogs &gt; 7.8, org.openide.execution &gt; 1.2, org.openide.explorer &gt; 6.8, org.openide.filesystems &gt; 6.2, org.openide.io, org.openide.loaders, org.openide.modules &gt; 6.2, org.openide.nodes &gt; 6.2, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0" OpenIDE-Module-Name="Common Scripting Language Platform Support" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Short-Description="APIs for handling paths in the Common Scripting Language Framework" OpenIDE-Module-Specification-Version="0.44"/>
+    
+</module>
+
+</module_group>
+
+<module_group name="Python">
+
+<module codenamebase="org.netbeans.modules.python.platform" distribution="org-netbeans-modules-python-platform.nbm" downloadsize="10954" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="false" OpenIDE-Module="org.netbeans.modules.python.platform" OpenIDE-Module-Display-Category="Python" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Module-Dependencies="org.netbeans.modules.python.core &gt; 1.0, org.openide.awt &gt; 7.2.0.1, org.openide.dialogs &gt; 7.7, org.openide.modules &gt; 7.7, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0" OpenIDE-Module-Name="python.platform" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Short-Description="Python Platform Manager" OpenIDE-Module-Specification-Version="1.1"/>
+    
+</module>
+
+<module codenamebase="org.netbeans.modules.python.core" distribution="org-netbeans-modules-python-core.nbm" downloadsize="23016" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="true" OpenIDE-Module="org.netbeans.modules.python.core" OpenIDE-Module-Display-Category="Python" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Module-Dependencies="org.netbeans.api.progress/1 &gt; 1.13, org.netbeans.modules.extexecution/2 &gt; 1.13, org.netbeans.modules.project.ant/1 &gt; 1.26.1, org.netbeans.modules.projectapi/1 &gt; 1.19.1, org.netbeans.modules.projectuiapi/1 &gt; 1.24.1.6, org.openide.awt &gt; 6.11.1.1, org.openide.dialogs &gt; 7.5.1, org.openide.filesystems &gt; 7.3.1, org.openide.io &gt; 1.13, org.openide.loaders &gt; 6.7.1, org.openide.modules &gt; 7.7, org.openide.nodes &gt; 7.2.1.1, org.openide.text &gt; 6.16.1, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0, org.openide.windows &gt; 6.18.1" OpenIDE-Module-Name="PythonCore" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Short-Description="Core of Python Editor" OpenIDE-Module-Specification-Version="1.0"/>
+    
+</module>
+
+<module codenamebase="org.netbeans.modules.python.debugger" distribution="org-netbeans-modules-python-debugger.nbm" downloadsize="93342" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="false" OpenIDE-Module="org.netbeans.modules.python.debugger" OpenIDE-Module-Display-Category="Python" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Module-Dependencies="org.netbeans.api.debugger/1 &gt; 1.14, org.netbeans.api.progress/1 &gt; 1.12.0.1, org.netbeans.modules.editor.lib/3 &gt; 3.1, org.netbeans.modules.editor.lib2/1 &gt; 1.11, org.netbeans.modules.python.core &gt; 1.0, org.netbeans.spi.debugger.ui/1 &gt; 2.13, org.netbeans.spi.viewmodel/2 &gt; 1.15, org.openide.awt &gt; 7.4, org.openide.dialogs &gt; 7.8, org.openide.execution &gt; 1.12, org.openide.filesystems &gt; 7.19, org.openide.io &gt; 1.13, org.openide.loaders &gt; 7.2, org.openide.modules &gt; 7.7, org.openide.nodes &gt; 7.3.0.1, org.openide.text &gt; 6.21, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0, org.openide.windows &gt; 6.24" OpenIDE-Module-Name="PythonDebugger" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Short-Description="Python Debugger" OpenIDE-Module-Specification-Version="1.2"/>
+    
+</module>
+
+<module codenamebase="org.netbeans.modules.python.editor" distribution="org-netbeans-modules-python-editor.nbm" downloadsize="3751267" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="false" OpenIDE-Module="org.netbeans.modules.python.editor" OpenIDE-Module-Display-Category="Python" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Module-Dependencies="org.eclipse.mylyn.wikitext.confluence.core &gt; 1.9.0, org.eclipse.mylyn.wikitext.core &gt; 1.9.0, org.eclipse.mylyn.wikitext.textile.core &gt; 1.9.0, org.netbeans.api.progress/1 &gt; 1.38.1, org.netbeans.core.multiview/1 &gt; 1.40.1, org.netbeans.modules.editor/3 &gt; 1.79.1.5.22.43, org.netbeans.modules.editor.codetemplates/1 = 1, org.netbeans.modules.editor.completion/1 &gt; 1.14, org.netbeans.modules.editor.deprecated.pre65formatting/0 &gt; 1.23.1.1.5.22.43, org.netbeans.modules.editor.indent/2 &gt; 1.5, org.netbeans.modules.editor.lib/3 &gt; 3.1, org.netbeans.modules.editor.lib2/1 &gt; 1.8.0.2, org.netbeans.modules.editor.mimelookup/1 &gt; 1.10, org.netbeans.modules.editor.settings/1 &gt; 1.53.1, org.netbeans.modules.editor.tools.storage &gt; 1.4.1, org.netbeans.modules.editor.util/1 &gt; 1.25.1, org.netbeans.modules.extexecution/2 &gt; 1.13, org.netbeans.modules.gsf.codecoverage &gt; 1.1, org.netbeans.modules.gsf.python.api &gt; 1.0, org.netbeans.modules.gsfpath.api/1 = 141128, org.netbeans.modules.lexer/2 &gt; 1.26.0.1, org.netbeans.modules.options.api/1 &gt; 1.5, org.netbeans.modules.options.editor/1 &gt; 1.20, org.netbeans.modules.projectapi/1 &gt; 1.15, org.netbeans.modules.projectuiapi/1 &gt; 1.29.0.6, org.netbeans.modules.python.core &gt; 1.0, org.netbeans.modules.queries/1 &gt; 1.13.1, org.netbeans.modules.refactoring.api &gt; 1.0, org.openide.awt &gt; 7.1.0.1, org.openide.dialogs &gt; 7.6, org.openide.filesystems &gt; 7.19, org.openide.loaders &gt; 6.9, org.openide.modules &gt; 7.7.1, org.openide.nodes &gt; 7.3.0.1, org.openide.text &gt; 6.18, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0, org.openide.windows &gt; 6.20" OpenIDE-Module-Name="Python Editor" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Short-Description="Python Editor" OpenIDE-Module-Specification-Version="1.0.1.141128"/>
+    
+</module>
+
+<module codenamebase="org.netbeans.modules.python.options" distribution="org-netbeans-modules-python-options.nbm" downloadsize="12747" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="false" OpenIDE-Module="org.netbeans.modules.python.options" OpenIDE-Module-Display-Category="Python" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Module-Dependencies="org.netbeans.modules.options.api/1 &gt; 1.5.1, org.netbeans.modules.python.core &gt; 1.0, org.netbeans.modules.python.debugger = 141128, org.openide.dialogs &gt; 7.11, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0, org.openide.windows &gt; 6.24" OpenIDE-Module-Name="Python Options" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Specification-Version="1.1"/>
+    
+</module>
+
+<module codenamebase="org.netbeans.modules.python.project" distribution="org-netbeans-modules-python-project.nbm" downloadsize="276174" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="false" OpenIDE-Module="org.netbeans.modules.python.project" OpenIDE-Module-Display-Category="Python" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Long-Description="Provides a basic project type which can hold Python source code." OpenIDE-Module-Module-Dependencies="org.netbeans.api.progress/1 &gt; 1.12.0.1, org.netbeans.modules.gototest/1 &gt; 1.3, org.netbeans.modules.gsf.codecoverage &gt; 1.0, org.netbeans.modules.gsfpath.api/1 &gt; 0.44, org.netbeans.modules.project.ant/1 &gt; 1.31, org.netbeans.modules.projectapi/1 &gt; 1.13.1, org.netbeans.modules.projectuiapi/1 &gt; 1.42, org.netbeans.modules.python.core &gt; 1.0, org.netbeans.modules.python.debugger = 141128, org.netbeans.modules.python.editor &gt; 1.0, org.netbeans.modules.queries/1 &gt; 1.13, org.openide.actions &gt; 6.8.0.1, org.openide.awt &gt; 6.11.1.1, org.openide.dialogs &gt; 7.6, org.openide.filesystems &gt; 7.19, org.openide.loaders &gt; 6.9, org.openide.nodes &gt; 7.2.1.1, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0, org.openide.windows &gt; 6.24, org.openidex.util/3 &gt; 3.16" OpenIDE-Module-Name="Python Projects" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Short-Description="Project type for Python sources." OpenIDE-Module-Specification-Version="0.3"/>
+    
+</module>
+
+<module codenamebase="org.netbeans.modules.python.samples" distribution="org-netbeans-modules-python-samples.nbm" downloadsize="18901" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="true" OpenIDE-Module="org.netbeans.modules.python.samples" OpenIDE-Module-Display-Category="Python" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Long-Description="Sample projects in Python and Jython to get a feel of programming in NetBeans IDE" OpenIDE-Module-Module-Dependencies="org.netbeans.modules.projectapi/1 &gt; 1.21, org.netbeans.modules.projectuiapi/1 &gt; 1.33, org.openide.awt &gt; 7.4, org.openide.dialogs &gt; 7.10, org.openide.filesystems &gt; 7.17, org.openide.loaders &gt; 7.5, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0" OpenIDE-Module-Name="Sample Python/Jython Projects" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Short-Description="Sample projects in Python and Jython" OpenIDE-Module-Specification-Version="1.1"/>
+    
+</module>
+
+</module_group>
+
+<module_group name="Ruby">
+
+<module codenamebase="org.netbeans.modules.gsf.python.api" distribution="org-netbeans-modules-gsf-python-api.nbm" downloadsize="27026" homepage="" license="AD9FBBC9" moduleauthor="" needsrestart="false" releasedate="2014/11/28">
+    <manifest AutoUpdate-Show-In-Client="true" OpenIDE-Module="org.netbeans.modules.gsf.python.api" OpenIDE-Module-Display-Category="Ruby" OpenIDE-Module-Implementation-Version="141128" OpenIDE-Module-Java-Dependencies="Java &gt; 1.6" OpenIDE-Module-Module-Dependencies="org.netbeans.modules.editor/3 &gt; 1.53, org.netbeans.modules.editor.indent/2 &gt; 1.5, org.netbeans.modules.editor.lib/3 &gt; 3.1, org.netbeans.modules.editor.lib2/1 &gt; 1.4, org.netbeans.modules.editor.util/1 &gt; 1.25, org.netbeans.modules.lexer/2 &gt; 1.10.0, org.netbeans.modules.options.api/1 &gt; 1.7, org.netbeans.spi.editor.hints/0-1 &gt; 1.7, org.openide.awt &gt; 7.10, org.openide.filesystems &gt; 6.3, org.openide.loaders &gt; 5.11, org.openide.nodes &gt; 6.9.0.1, org.openide.text &gt; 6.16, org.openide.util &gt; 8.0, org.openide.util.lookup &gt; 8.0" OpenIDE-Module-Name="Common Scripting Language API (in Python)" OpenIDE-Module-Requires="org.openide.modules.ModuleFormat1" OpenIDE-Module-Short-Description="API for defining custom languages in the IDE" OpenIDE-Module-Specification-Version="1.0"/>
+    
+</module>
+
+</module_group>
+
+<license name="AD9FBBC9" url="licenses/AD9FBBC9.license"/>
+</module_updates>
+
