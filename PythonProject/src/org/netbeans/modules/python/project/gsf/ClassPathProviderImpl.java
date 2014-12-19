@@ -45,14 +45,19 @@ package org.netbeans.modules.python.project.gsf;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.netbeans.api.java.classpath.ClassPath;
 import org.netbeans.modules.python.project.PythonProject;
 import org.netbeans.modules.python.project.SourceRoots;
 import org.netbeans.modules.python.project.util.Pair;
-import org.netbeans.modules.gsfpath.api.classpath.ClassPath;
-import org.netbeans.modules.gsfpath.spi.classpath.ClassPathFactory;
-import org.netbeans.modules.gsfpath.spi.classpath.ClassPathImplementation;
-import org.netbeans.modules.gsfpath.spi.classpath.ClassPathProvider;
-import org.netbeans.modules.gsfpath.spi.classpath.support.ClassPathSupport;
+import org.netbeans.spi.java.classpath.ClassPathFactory;
+import org.netbeans.spi.java.classpath.ClassPathImplementation;
+import org.netbeans.spi.java.classpath.ClassPathProvider;
+import org.netbeans.spi.java.classpath.support.ClassPathSupport;
+//import org.netbeans.modules.gsfpath.api.classpath.ClassPath;
+//import org.netbeans.modules.gsfpath.spi.classpath.ClassPathFactory;
+//import org.netbeans.modules.gsfpath.spi.classpath.ClassPathImplementation;
+//import org.netbeans.modules.gsfpath.spi.classpath.ClassPathProvider;
+//import org.netbeans.modules.gsfpath.spi.classpath.support.ClassPathSupport;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 
