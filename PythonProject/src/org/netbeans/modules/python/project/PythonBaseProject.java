@@ -16,8 +16,8 @@ import org.netbeans.modules.python.project.ui.customizer.PythonCustomizerProvide
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectInformation;
 import org.netbeans.api.project.ProjectManager;
-import org.netbeans.modules.gsfpath.api.classpath.ClassPath;
-import org.netbeans.modules.gsfpath.api.classpath.GlobalPathRegistry;
+//import org.netbeans.modules.gsfpath.api.classpath.ClassPath;
+//import org.netbeans.modules.gsfpath.api.classpath.GlobalPathRegistry;
 import org.netbeans.modules.python.editor.codecoverage.PythonCoverageProvider;
 import org.netbeans.spi.project.AuxiliaryConfiguration;
 import org.netbeans.spi.project.support.ant.AntProjectHelper;
