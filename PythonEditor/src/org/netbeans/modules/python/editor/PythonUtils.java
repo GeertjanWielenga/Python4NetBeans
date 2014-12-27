@@ -33,7 +33,6 @@ package org.netbeans.modules.python.editor;
 import java.util.Comparator;
 import java.util.List;
 import javax.swing.text.Document;
-import org.netbeans.api.*;
 import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
@@ -42,13 +41,11 @@ import org.netbeans.api.project.SourceGroup;
 import org.netbeans.api.project.Sources;
 import org.netbeans.lib.editor.codetemplates.api.CodeTemplate;
 import org.netbeans.lib.editor.codetemplates.api.CodeTemplateManager;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.api.PythonPlatform;
 import org.netbeans.modules.python.api.PythonPlatformManager;
-import org.netbeans.modules.python.editor.lexer.PythonTokenId;
 import org.openide.filesystems.FileObject;
-import org.openide.filesystems.FileStateInvalidException;
 import org.openide.filesystems.FileUtil;
-import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
 import org.python.antlr.PythonTree;
 import org.python.antlr.ast.Attribute;
@@ -61,13 +58,13 @@ import org.python.antlr.ast.Name;
 public class PythonUtils {
     public static boolean canContainPython(FileObject f) {
         String mimeType = f.getMIMEType();
-        return PythonTokenId.PYTHON_MIME_TYPE.equals(mimeType);
+        return PythonMIMEResolver.PYTHON_MIME_TYPE.equals(mimeType);
     // TODO:       "text/x-yaml".equals(mimeType) ||  // NOI18N
     // RubyInstallation.RHTML_MIME_TYPE.equals(mimeType);
     }
 
     public static boolean isPythonFile(FileObject f) {
-        return PythonTokenId.PYTHON_MIME_TYPE.equals(f.getMIMEType());
+        return PythonMIMEResolver.PYTHON_MIME_TYPE.equals(f.getMIMEType());
     }
 
     public static boolean isRstFile(FileObject f) {
@@ -77,7 +74,7 @@ public class PythonUtils {
     public static boolean isPythonDocument(Document doc) {
         String mimeType = (String)doc.getProperty("mimeType"); // NOI18N
 
-        return PythonTokenId.PYTHON_MIME_TYPE.equals(mimeType);
+        return PythonMIMEResolver.PYTHON_MIME_TYPE.equals(mimeType);
     }
     public static final String DOT__INIT__ = ".__init__"; // NOI18N
 

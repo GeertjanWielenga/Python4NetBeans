@@ -50,6 +50,7 @@ import org.netbeans.modules.csl.api.OffsetRange;
 import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.openide.util.Exceptions;
 import org.python.antlr.PythonTree;
 
@@ -260,7 +261,7 @@ public class PythonKeystrokeHandler implements KeystrokeHandler {
         // The editor options code is calling methods on BaseOptions instead of looking in the settings map :(
         //Boolean b = ((Boolean)Settings.getValue(doc.getKitClass(), SettingsNames.PAIR_CHARACTERS_COMPLETION));
         //return b == null || b.booleanValue();
-        EditorOptions options = EditorOptions.get(PythonTokenId.PYTHON_MIME_TYPE);
+        EditorOptions options = EditorOptions.get(PythonMIMEResolver.PYTHON_MIME_TYPE);
         if (options != null) {
             return options.getMatchBrackets();
         }

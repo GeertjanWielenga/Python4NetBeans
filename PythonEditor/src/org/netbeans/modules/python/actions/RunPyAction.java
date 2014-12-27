@@ -5,14 +5,12 @@
 package org.netbeans.modules.python.actions;
 
 import java.io.File;
-import java.util.Properties;
 import org.netbeans.modules.python.api.PythonExecution;
-import org.netbeans.modules.python.api.PythonOptions;
 import org.netbeans.modules.python.api.PythonPlatform;
 import org.netbeans.modules.python.api.PythonPlatformManager;
-import org.netbeans.modules.python.editor.lexer.PythonTokenId;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ui.OpenProjects;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.loaders.DataObject;
@@ -25,7 +23,7 @@ public final class RunPyAction extends CookieAction {
     protected void performAction(Node[] activatedNodes) {
         //listProperties();
         DataObject gdo = activatedNodes[0].getLookup().lookup(DataObject.class);
-        if (gdo.getPrimaryFile().getMIMEType().equals(PythonTokenId.PYTHON_MIME_TYPE)) {
+        if (gdo.getPrimaryFile().getMIMEType().equals(PythonMIMEResolver.PYTHON_MIME_TYPE)) {
 
             String path = gdo.getPrimaryFile().getParent().getPath();
             //int pos = path.lastIndexOf("/");
@@ -67,7 +65,7 @@ public final class RunPyAction extends CookieAction {
         boolean results = false; //super.enable(activatedNodes);
         if (activatedNodes.length > 0) {
             DataObject gdo = activatedNodes[0].getLookup().lookup(DataObject.class);
-            results = gdo.getPrimaryFile().getMIMEType().equals(PythonTokenId.PYTHON_MIME_TYPE);
+            results = gdo.getPrimaryFile().getMIMEType().equals(PythonMIMEResolver.PYTHON_MIME_TYPE);
         }
         return results;
     }

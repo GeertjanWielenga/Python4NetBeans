@@ -73,6 +73,7 @@ import org.netbeans.modules.gsf.codecoverage.api.CoverageType;
 import org.netbeans.modules.gsf.codecoverage.api.FileCoverageDetails;
 import org.netbeans.modules.gsf.codecoverage.api.FileCoverageSummary;
 import org.netbeans.modules.python.api.PythonExecution;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
 import org.openide.filesystems.FileObject;
@@ -96,7 +97,7 @@ public final class PythonCoverageProvider implements CoverageProvider {
     private Map<String, String> fullNames;
     private long timestamp;
     private Project project;
-    private Set<String> mimeTypes = Collections.singleton(PythonTokenId.PYTHON_MIME_TYPE);
+    private Set<String> mimeTypes = Collections.singleton(PythonMIMEResolver.PYTHON_MIME_TYPE);
     private Boolean enabled;
     private Boolean aggregating;
 

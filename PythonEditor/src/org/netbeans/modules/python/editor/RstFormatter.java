@@ -61,6 +61,7 @@ import org.netbeans.modules.csl.api.ElementHandle;
 import org.netbeans.modules.csl.api.ElementKind;
 import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.elements.Element;
 import org.netbeans.modules.python.editor.elements.IndexedElement;
 import org.netbeans.modules.python.editor.elements.IndexedMethod;
@@ -186,7 +187,7 @@ public class RstFormatter {
                 } else if (marker.equals("keyword")) { // NOI18N
                     sb.append("<code style=\""); // NOI18N
 
-                    MimePath mimePath = MimePath.parse(PythonTokenId.PYTHON_MIME_TYPE);
+                    MimePath mimePath = MimePath.parse(PythonMIMEResolver.PYTHON_MIME_TYPE);
                     Lookup lookup = MimeLookup.getLookup(mimePath);
                     FontColorSettings fcs = lookup.lookup(FontColorSettings.class);
 
@@ -1124,7 +1125,7 @@ public class RstFormatter {
         }
 
         Language<?> language = PythonTokenId.language();
-        String mimeType = PythonTokenId.PYTHON_MIME_TYPE;
+        String mimeType = PythonMIMEResolver.PYTHON_MIME_TYPE;
         // TODO - handle YAML and other languages I can see in the documentation...
         /*if (python.indexOf(" <%") != -1) { // NOI18N
         mimeType = "application/x-httpd-eruby"; // RHTML

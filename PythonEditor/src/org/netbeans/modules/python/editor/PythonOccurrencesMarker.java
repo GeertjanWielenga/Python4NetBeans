@@ -72,7 +72,7 @@ import org.python.antlr.ast.Name;
  *
  * @author Tor Norbye
  */
-public class PythonOccurrencesMarker extends OccurrencesFinder {
+public class PythonOccurrencesMarker extends OccurrencesFinder<PythonParserResult> {
     private boolean cancelled;
     private int caretPosition;
     private Map<OffsetRange, ColoringAttributes> occurrences;
@@ -112,18 +112,15 @@ public class PythonOccurrencesMarker extends OccurrencesFinder {
         return Scheduler.CURSOR_SENSITIVE_TASK_SCHEDULER;
     }
 
-    public void run(Result info, SchedulerEvent event) {
+    @Override
+    public void run(PythonParserResult info, SchedulerEvent event) {
         resume();
 
         if (isCancelled()) {
             return;
         }
 
-        PythonParserResult ppr = PythonAstUtils.getParseResult((ParserResult) info);
-        if (ppr == null) {
-            return;
-        }
-        PythonTree root = PythonAstUtils.getRoot(ppr);
+        PythonTree root = PythonAstUtils.getRoot(info);
         if (root == null) {
             return;
         }
@@ -139,7 +136,7 @@ public class PythonOccurrencesMarker extends OccurrencesFinder {
             return;
         }
         PythonTree closest = path.leaf();
-        OffsetRange blankRange = ppr.getSanitizedRange();
+        OffsetRange blankRange = info.getSanitizedRange();
 
         if (blankRange.containsInclusive(astOffset)) {
             closest = null;
@@ -168,7 +165,7 @@ public class PythonOccurrencesMarker extends OccurrencesFinder {
                     if (id == PythonCommentTokenId.VARNAME) {
                         String name = token.text().toString();
 
-                        offsets = findNames(ppr, path, name, offsets);
+                        offsets = findNames(info, path, name, offsets);
 
                         int start = embedded.offset();
                         offsets.add(new OffsetRange(start, start + name.length()));
@@ -197,13 +194,13 @@ public class PythonOccurrencesMarker extends OccurrencesFinder {
             //addNodes(scopeNode != null ? scopeNode : root, name, highlights);
             //closest = null;
             String name = ((Name)closest).getInternalId();
-            offsets = findNames(ppr, path, name, offsets);
+            offsets = findNames(info, path, name, offsets);
         } else if (closest instanceof Attribute) {
             Attribute attr = (Attribute)closest;
-            offsets = findSameAttributes(ppr, root, attr);
+            offsets = findSameAttributes(info, root, attr);
         } else if (closest instanceof Import || closest instanceof ImportFrom) {
             // Try to find occurrences of an imported symbol
-            offsets = findNameFromImport(caretPosition, ppr, path, offsets);
+            offsets = findNameFromImport(caretPosition, info, path, offsets);
         } else if ((closest instanceof FunctionDef || closest instanceof ClassDef) &&
                 PythonAstUtils.getNameRange(null, closest).containsInclusive(astOffset)) {
             String name;
@@ -213,13 +210,13 @@ public class PythonOccurrencesMarker extends OccurrencesFinder {
                 assert closest instanceof ClassDef;
                 name = ((ClassDef)closest).getInternalName();
             }
-            offsets = findNames(ppr, path, name, offsets);
+            offsets = findNames(info, path, name, offsets);
 
             if (offsets == null || offsets.size() == 0) {
                 if (closest instanceof FunctionDef) {
                     FunctionDef def = (FunctionDef)closest;
                     // Call: highlight calls and definitions
-                    CallVisitor visitor = new CallVisitor(ppr, def, null);
+                    CallVisitor visitor = new CallVisitor(info, def, null);
                     PythonTree scope = PythonAstUtils.getClassScope(path);
                     try {
                         visitor.visit(scope);
@@ -264,7 +261,7 @@ public class PythonOccurrencesMarker extends OccurrencesFinder {
             }
             if (call != null || def != null) {
                 // Call: highlight calls and definitions
-                CallVisitor visitor = new CallVisitor(ppr, def, call);
+                CallVisitor visitor = new CallVisitor(info, def, call);
                 PythonTree scope = PythonAstUtils.getClassScope(path);
                 try {
                     visitor.visit(scope);

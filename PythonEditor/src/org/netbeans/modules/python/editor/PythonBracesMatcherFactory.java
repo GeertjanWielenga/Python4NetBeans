@@ -28,58 +28,25 @@
  *
  * Portions Copyrighted 2007 Sun Microsystems, Inc.
  */
-package org.netbeans.modules.python.editor.elements;
+package org.netbeans.modules.python.editor;
 
-import java.util.Collections;
-import java.util.Set;
-import org.netbeans.modules.csl.api.ElementHandle;
-import org.netbeans.modules.csl.api.ElementKind;
-import org.netbeans.modules.csl.api.Modifier;
-import org.netbeans.modules.csl.api.OffsetRange;
-import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.api.editor.mimelookup.MimeRegistration;
 import org.netbeans.modules.python.api.PythonMIMEResolver;
-import org.openide.filesystems.FileObject;
+import org.netbeans.spi.editor.bracesmatching.BracesMatcher;
+import org.netbeans.spi.editor.bracesmatching.BracesMatcherFactory;
+import org.netbeans.spi.editor.bracesmatching.MatcherContext;
+import org.netbeans.spi.editor.bracesmatching.support.BracesMatcherSupport;
 
 /**
  *
- * @author Tor Norbye
+ * @author Ralph Benjamin Ruijs <ralphbenjamin@netbeans.org>
  */
-public abstract class Element implements ElementHandle {
-    @Override
-    public abstract String getName();
+@MimeRegistration(mimeType = PythonMIMEResolver.PYTHON_MIME_TYPE, service = BracesMatcherFactory.class)
+public class PythonBracesMatcherFactory implements BracesMatcherFactory {
 
     @Override
-    public abstract ElementKind getKind();
-
-    @Override
-    public String getMimeType() {
-        return PythonMIMEResolver.PYTHON_MIME_TYPE;
+    public BracesMatcher createMatcher(MatcherContext mc) {
+        return BracesMatcherSupport.defaultMatcher(mc, -1, -1);
     }
-
-    @Override
-    public boolean signatureEquals(ElementHandle handle) {
-        // XXX TODO
-        return false;
-    }
-
-    @Override
-    public OffsetRange getOffsetRange(ParserResult pr) {
-        // XXX TODO
-        return null;
-    }
-
-    @Override
-    public FileObject getFileObject() {
-        return null;
-    }
-
-    @Override
-    public Set<Modifier> getModifiers() {
-        return Collections.emptySet();
-    }
-
-    @Override
-    public String getIn() {
-        return null;
-    }
+    
 }

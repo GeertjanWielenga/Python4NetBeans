@@ -45,12 +45,9 @@ import org.netbeans.modules.csl.api.SemanticAnalyzer;
 import org.netbeans.modules.csl.api.StructureScanner;
 import org.netbeans.modules.csl.spi.DefaultLanguageConfig;
 import org.netbeans.modules.csl.spi.LanguageRegistration;
-import org.netbeans.modules.parsing.api.Snapshot;
 import org.netbeans.modules.parsing.spi.Parser;
-import org.netbeans.modules.parsing.spi.indexing.Context;
-import org.netbeans.modules.parsing.spi.indexing.EmbeddingIndexer;
 import org.netbeans.modules.parsing.spi.indexing.EmbeddingIndexerFactory;
-import org.netbeans.modules.parsing.spi.indexing.Indexable;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
@@ -61,7 +58,7 @@ import org.openide.modules.InstalledFileLocator;
  * @author alley
  * @author Tor Norbye
  */
-@LanguageRegistration(mimeType="text/x-python")
+@LanguageRegistration(mimeType=PythonMIMEResolver.PYTHON_MIME_TYPE)
 public class PythonLanguage extends DefaultLanguageConfig {
     private static FileObject jsStubsFO;
 
@@ -78,10 +75,12 @@ public class PythonLanguage extends DefaultLanguageConfig {
                 c == '_';
     }
 
+    @Override
     public Language getLexerLanguage() {
         return PythonTokenId.language();
     }
 
+    @Override
     public String getDisplayName() {
         return "Python";
     }
@@ -111,7 +110,7 @@ public class PythonLanguage extends DefaultLanguageConfig {
     public SemanticAnalyzer getSemanticAnalyzer() {
         return new PythonSemanticHighlighter();
     }
-
+    
     @Override
     public KeystrokeHandler getKeystrokeHandler() {
         return new PythonKeystrokeHandler();

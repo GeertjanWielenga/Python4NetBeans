@@ -73,6 +73,7 @@ import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
 import org.netbeans.modules.parsing.spi.indexing.support.QuerySupport;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.PythonParser.Sanitize;
 import org.netbeans.modules.python.editor.elements.IndexedPackage;
 import org.netbeans.modules.python.editor.imports.ImportManager;
@@ -2362,7 +2363,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         }
 
         public String getMimeType() {
-            return PythonTokenId.PYTHON_MIME_TYPE;
+            return PythonMIMEResolver.PYTHON_MIME_TYPE;
         }
 
         public String getIn() {
@@ -2462,7 +2463,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         }
 
         public String getMimeType() {
-            return PythonTokenId.PYTHON_MIME_TYPE;
+            return PythonMIMEResolver.PYTHON_MIME_TYPE;
         }
 
         public String getIn() {

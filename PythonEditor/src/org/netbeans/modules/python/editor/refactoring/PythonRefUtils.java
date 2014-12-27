@@ -71,6 +71,7 @@ import org.netbeans.api.project.ui.OpenProjects;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.modules.csl.api.ElementKind;
 import org.netbeans.modules.parsing.api.Source;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.PythonUtils;
@@ -162,7 +163,7 @@ public class PythonRefUtils {
         StringBuffer buf = new StringBuffer();
         // TODO - check whether we need python highlighting or rhtml highlighting
         TokenHierarchy tokenH = TokenHierarchy.create(text, PythonTokenId.language());
-        Lookup lookup = MimeLookup.getLookup(MimePath.get(PythonTokenId.PYTHON_MIME_TYPE));
+        Lookup lookup = MimeLookup.getLookup(MimePath.get(PythonMIMEResolver.PYTHON_MIME_TYPE));
         FontColorSettings settings = lookup.lookup(FontColorSettings.class);
         @SuppressWarnings("unchecked")
         TokenSequence<? extends TokenId> tok = tokenH.tokenSequence();

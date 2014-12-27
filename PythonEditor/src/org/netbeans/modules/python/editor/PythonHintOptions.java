@@ -32,6 +32,7 @@ package org.netbeans.modules.python.editor;
 
 import org.netbeans.modules.csl.api.HintsProvider;
 import org.netbeans.modules.csl.api.HintsProvider.HintsManager;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
 import org.netbeans.spi.options.AdvancedOption;
 import org.netbeans.spi.options.OptionsPanelController;
@@ -56,7 +57,7 @@ public class PythonHintOptions extends AdvancedOption {
     @Override
     public synchronized OptionsPanelController create() {
         if (panelController == null) {
-            HintsManager manager = HintsProvider.HintsManager.getManagerForMimeType(PythonTokenId.PYTHON_MIME_TYPE);
+            HintsManager manager = HintsProvider.HintsManager.getManagerForMimeType(PythonMIMEResolver.PYTHON_MIME_TYPE);
             assert manager != null;
             panelController = manager.getOptionsController();
         }

@@ -52,6 +52,7 @@ import org.netbeans.api.lexer.Language;
 import org.netbeans.api.lexer.LanguagePath;
 import org.netbeans.api.lexer.Token;
 import org.netbeans.api.lexer.TokenId;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.PythonUtils;
 import org.netbeans.spi.lexer.LanguageEmbedding;
 import org.netbeans.spi.lexer.LanguageHierarchy;
@@ -116,7 +117,6 @@ public enum PythonTokenId implements TokenId {
     NONUNARY_OP(null, OPERATOR_CAT);
     private final String fixedText;
     private final String primaryCategory;
-    public static final String PYTHON_MIME_TYPE = "text/x-python"; // NOI18N
 
     PythonTokenId(String fixedText, String primaryCategory) {
         this.fixedText = fixedText;
@@ -133,7 +133,7 @@ public enum PythonTokenId implements TokenId {
     private static final Language<PythonTokenId> language =
             new LanguageHierarchy<PythonTokenId>() {
                 protected String mimeType() {
-                    return PythonTokenId.PYTHON_MIME_TYPE;
+                    return PythonMIMEResolver.PYTHON_MIME_TYPE;
                 }
 
                 protected Collection<PythonTokenId> createTokenIds() {
