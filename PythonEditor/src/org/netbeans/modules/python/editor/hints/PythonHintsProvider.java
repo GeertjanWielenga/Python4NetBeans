@@ -38,19 +38,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import org.netbeans.modules.gsf.api.HintSeverity;
+import org.netbeans.modules.csl.api.Error;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.HintsProvider;
+import org.netbeans.modules.csl.api.HintsProvider.HintsManager;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.Rule;
+import org.netbeans.modules.csl.api.RuleContext;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.python.editor.AstPath;
 import org.netbeans.modules.python.editor.PythonAstUtils;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.Error;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintsProvider;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.ParserResult;
-import org.netbeans.modules.gsf.api.Rule;
-import org.netbeans.modules.gsf.api.RuleContext;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
 import org.netbeans.modules.python.editor.PythonParserResult;
 import org.openide.util.Exceptions;
 import org.python.antlr.PythonTree;
@@ -89,7 +89,7 @@ public class PythonHintsProvider implements HintsProvider {
             return HintSeverity.ERROR;
         }
     }
-
+    
     public void computeErrors(HintsManager manager, RuleContext context, List<Hint> result, List<Error> unhandled) {
         ParserResult parserResult = context.parserResult;
         if (parserResult == null) {
@@ -108,7 +108,7 @@ public class PythonHintsProvider implements HintsProvider {
             }
         }
 
-        List<Error> errors = parserResult.getDiagnostics();
+        List<? extends Error> errors = parserResult.getDiagnostics();
         if (errors == null || errors.size() == 0) {
             return;
         }
@@ -147,7 +147,7 @@ public class PythonHintsProvider implements HintsProvider {
             return;
         }
         @SuppressWarnings("unchecked")
-        List<PythonSelectionRule> hints = (List<PythonSelectionRule>)manager.getSelectionHints();
+        List<? extends Rule.SelectionRule> hints = manager.getSelectionHints();
 
         if (hints.isEmpty()) {
             return;
@@ -165,22 +165,26 @@ public class PythonHintsProvider implements HintsProvider {
         }
 }
 
-    private void applySelectionRules(HintsManager manager, RuleContext context, List<PythonSelectionRule> rules, List<Hint> result) {
+    private void applySelectionRules(HintsManager manager, RuleContext context, List<? extends Rule.SelectionRule> rules, List<Hint> result) {
 
         PythonRuleContext pythonContext = (PythonRuleContext)context;
 
-        for (PythonSelectionRule rule : rules) {
+        for (Rule.SelectionRule rule : rules) {
             if (!rule.appliesTo(context)) {
                 continue;
             }
+            
+            if(!(rule instanceof PythonSelectionRule)) {
+                continue;
+            }
 
-            if (!manager.isEnabled(rule)) {
+            if (!manager.isEnabled((PythonSelectionRule)rule)) {
                 continue;
             }
 
             try {
                 context.doc.readLock();
-                rule.run(pythonContext, result);
+                ((PythonSelectionRule)rule).run(pythonContext, result);
             } finally {
                 context.doc.readUnlock();
             }
@@ -274,7 +278,7 @@ public class PythonHintsProvider implements HintsProvider {
         try {
             context.doc.readLock();
 
-            CompilationInfo info = context.compilationInfo;
+            PythonParserResult info = (PythonParserResult)context.parserResult;
             int astOffset = PythonAstUtils.getAstOffset(info, caretOffset);
             AstPath path = AstPath.get(root, astOffset);
             Iterator<PythonTree> it = path.leafToRoot();

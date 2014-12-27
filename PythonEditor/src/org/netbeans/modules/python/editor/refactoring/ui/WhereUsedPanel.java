@@ -48,6 +48,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ItemEvent;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import javax.swing.SwingUtilities;
@@ -58,13 +59,15 @@ import org.openide.awt.Mnemonics;
 import org.openide.util.NbBundle;
 import org.netbeans.modules.python.editor.refactoring.RefactoringModule;
 import javax.swing.JPanel;
-import org.netbeans.modules.gsf.api.CancellableTask;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.api.Modifier;
-import org.netbeans.napi.gsfret.source.CompilationController;
-import org.netbeans.napi.gsfret.source.Phase;
-import org.netbeans.napi.gsfret.source.Source;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.api.Modifier;
+import org.netbeans.modules.parsing.api.ParserManager;
+import org.netbeans.modules.parsing.api.ResultIterator;
+import org.netbeans.modules.parsing.api.Source;
+import org.netbeans.modules.parsing.api.UserTask;
+import org.netbeans.modules.parsing.spi.ParseException;
 import org.netbeans.modules.python.editor.refactoring.PythonElementCtx;
+import org.openide.util.Exceptions;
 
 /**
  * Based on the WhereUsedPanel in Java refactoring by Jan Becicka.
@@ -95,11 +98,8 @@ public class WhereUsedPanel extends JPanel implements CustomRefactoringPanel {
         if (initialized) {
             return;
         }
-        Source source = PythonRefUtils.getSource(element.getFileObject());
-        CancellableTask<CompilationController> task = new CancellableTask<CompilationController>() {
-            public void cancel() {
-                throw new UnsupportedOperationException("Not supported yet.");
-            }
+        Source source = Source.create(element.getFileObject());
+        UserTask task = new UserTask() {
 
             // TODO - handle methods in modules!!!!
             private String getClassName(PythonElementCtx element) {
@@ -109,8 +109,7 @@ public class WhereUsedPanel extends JPanel implements CustomRefactoringPanel {
             /**
              * @todo For method calls, try to figure out the call type with the type analyzer
              */
-            public void run(CompilationController info) throws Exception {
-                info.toPhase(Phase.RESOLVED);
+            public void run(ResultIterator iter) throws Exception {
                 String m_isBaseClassText = null;
                 final String labelText;
                 Set<Modifier> modif = new HashSet<Modifier>();
@@ -192,9 +191,9 @@ public class WhereUsedPanel extends JPanel implements CustomRefactoringPanel {
             }
         };
         try {
-            source.runUserActionTask(task, true);
-        } catch (IOException ioe) {
-            throw (RuntimeException)new RuntimeException().initCause(ioe);
+            ParserManager.parse(Collections.singleton(source), task);
+        } catch (ParseException ex) {
+            Exceptions.printStackTrace(ex);
         }
         initialized = true;
     }

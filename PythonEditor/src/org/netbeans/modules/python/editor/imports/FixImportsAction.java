@@ -44,7 +44,6 @@ package org.netbeans.modules.python.editor.imports;
 import java.awt.Dialog;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,16 +53,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.prefs.Preferences;
 import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.text.JTextComponent;
 import org.netbeans.editor.BaseAction;
 import org.netbeans.editor.BaseDocument;
-import org.netbeans.modules.gsf.api.CancellableTask;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.SourceModel;
-import org.netbeans.modules.gsf.api.SourceModelFactory;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.parsing.api.ParserManager;
+import org.netbeans.modules.parsing.api.ResultIterator;
+import org.netbeans.modules.parsing.api.Source;
+import org.netbeans.modules.parsing.api.UserTask;
+import org.netbeans.modules.parsing.spi.ParseException;
 import org.netbeans.modules.python.editor.PythonAstUtils;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.options.CodeStyle.ImportCleanupStyle;
 import org.openide.DialogDescriptor;
 import org.openide.DialogDisplayer;
@@ -129,21 +129,20 @@ public class FixImportsAction extends BaseAction {
             // Move imports that I think may be unused to the end - or just comment them out?
 
             // For imports: Gather imports from everywhere... move others into the same section
-            CompilationInfo info = null;
+            PythonParserResult info = null;
 
-            SourceModel model = SourceModelFactory.getInstance().getModel(fo);
+            Source model = Source.create(fo);
             if (model != null) {
-                final CompilationInfo[] infoHolder = new CompilationInfo[1];
+                final PythonParserResult[] infoHolder = new PythonParserResult[1];
                 try {
-                    model.runUserActionTask(new CancellableTask<CompilationInfo>() {
-                        public void cancel() {
-                        }
+                    ParserManager.parse(Collections.singleton(model), new UserTask() {
 
-                        public void run(CompilationInfo info) throws Exception {
-                            infoHolder[0] = info;
+                        @Override
+                        public void run(ResultIterator resultIterator) throws Exception {
+                            infoHolder[0] = (PythonParserResult) resultIterator.getParserResult();
                         }
-                    }, false);
-                } catch (IOException ex) {
+                    });
+                } catch (ParseException ex) {
                     Exceptions.printStackTrace(ex);
                 }
                 info = infoHolder[0];

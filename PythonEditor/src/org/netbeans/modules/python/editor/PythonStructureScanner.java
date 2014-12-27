@@ -39,11 +39,13 @@ import javax.swing.text.BadLocationException;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.StructureItem;
-import org.netbeans.modules.gsf.api.StructureScanner;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.StructureItem;
+import org.netbeans.modules.csl.api.StructureScanner;
+import org.netbeans.modules.csl.api.StructureScanner.Configuration;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.python.editor.scopes.ScopeInfo;
 import org.netbeans.modules.python.editor.scopes.SymInfo;
 import org.netbeans.modules.python.editor.scopes.SymbolTable;
@@ -61,24 +63,8 @@ import org.python.antlr.ast.Str;
  * @author Tor Norbye
  */
 public class PythonStructureScanner implements StructureScanner {
-    public static PythonStructureItem create(SymbolTable scopes, ClassDef def) {
-        PythonStructureItem item = new PythonStructureItem(scopes, def, def.getInternalName(), ElementKind.CLASS);
-
-        return item;
-    }
-
-    public static PythonStructureItem create(SymbolTable scopes, FunctionDef def) {
-        String name = def.getInternalName();
-        ElementKind kind = ElementKind.METHOD;
-        if ("__init__".equals(name)) { // NOI18N
-            kind = ElementKind.CONSTRUCTOR;
-        }
-        PythonStructureItem item = new PythonStructureItem(scopes, def, name, kind);
-
-        return item;
-    }
-
-    public static AnalysisResult analyze(CompilationInfo info) {
+    
+    public static AnalysisResult analyze(PythonParserResult info) {
         AnalysisResult analysisResult = new AnalysisResult();
 
         PythonTree root = PythonAstUtils.getRoot(info);
@@ -96,16 +82,24 @@ public class PythonStructureScanner implements StructureScanner {
         return analysisResult;
     }
 
-    public List<? extends StructureItem> scan(CompilationInfo info) {
+    @Override
+    public List<? extends StructureItem> scan(ParserResult info) {
         PythonParserResult parseResult = PythonAstUtils.getParseResult(info);
         if (parseResult == null) {
             return Collections.emptyList();
         }
 
-        return parseResult.getStructure().getElements();
+        return getStructure(parseResult).getElements();
+    }
+    
+    public PythonStructureScanner.AnalysisResult getStructure(PythonParserResult result) {
+        // TODO Cache ! (Used to be in PythonParserResult
+        AnalysisResult analysisResult = PythonStructureScanner.analyze(result);
+        return analysisResult;
     }
 
-    public Map<String, List<OffsetRange>> folds(CompilationInfo info) {
+    @Override
+    public Map<String, List<OffsetRange>> folds(ParserResult info) {
         PythonParserResult result = PythonAstUtils.getParseResult(info);
         PythonTree root = PythonAstUtils.getRoot(result);
         if (root == null) {
@@ -119,11 +113,11 @@ public class PythonStructureScanner implements StructureScanner {
         //List<?extends AstElement> elements = ar.getElements();
         //List<StructureItem> itemList = new ArrayList<StructureItem>(elements.size());
 
-        BaseDocument doc = (BaseDocument)info.getDocument();
+        BaseDocument doc = GsfUtilities.getDocument(result.getSnapshot().getSource().getFileObject(), false);
         if (doc != null) {
             try {
                 doc.readLock(); // For Utilities.getRowEnd() access
-                FoldVisitor visitor = new FoldVisitor(info, doc);
+                FoldVisitor visitor = new FoldVisitor((PythonParserResult) info, doc);
                 visitor.visit(root);
                 List<OffsetRange> codeBlocks = visitor.getCodeBlocks();
 
@@ -140,18 +134,18 @@ public class PythonStructureScanner implements StructureScanner {
         return Collections.emptyMap();
     }
 
+    @Override
     public Configuration getConfiguration() {
-        return null;
+        return new Configuration(true, true, -1);
     }
 
     private static class FoldVisitor extends Visitor {
         private List<OffsetRange> codeBlocks = new ArrayList<OffsetRange>();
-        private CompilationInfo info;
+        private PythonParserResult info;
         private BaseDocument doc;
 
-        private FoldVisitor(CompilationInfo info, BaseDocument doc) {
+        private FoldVisitor(PythonParserResult info, BaseDocument doc) {
             this.info = info;
-
             this.doc = doc;
         }
 
@@ -211,7 +205,7 @@ public class PythonStructureScanner implements StructureScanner {
 
         @Override
         public Object visitClassDef(ClassDef def) throws Exception {
-            PythonStructureItem item = new PythonStructureItem(scopes, def, def.getInternalName(), ElementKind.CLASS);
+            PythonStructureItem item = new PythonStructureItem(scopes, def);
             add(item);
 
             ScopeInfo scope = scopes.getScopeInfo(def);
@@ -237,7 +231,7 @@ public class PythonStructureScanner implements StructureScanner {
 
         @Override
         public Object visitFunctionDef(FunctionDef def) throws Exception {
-            PythonStructureItem item = create(scopes, def);
+            PythonStructureItem item = new PythonStructureItem(scopes, def);
 
             add(item);
             stack.add(item);

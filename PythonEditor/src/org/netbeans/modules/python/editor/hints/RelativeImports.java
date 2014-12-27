@@ -52,14 +52,15 @@ import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.EditList;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.PreviewableFix;
-import org.netbeans.modules.gsf.api.RuleContext;
+import org.netbeans.modules.csl.api.EditList;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.PreviewableFix;
+import org.netbeans.modules.csl.api.RuleContext;
+import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.openide.filesystems.FileObject;
 import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
@@ -87,7 +88,7 @@ public class RelativeImports extends PythonAstRule {
         ImportFrom imp = (ImportFrom)context.node;
         if (imp.getInternalModule() != null && imp.getInternalModule().startsWith(".")) {
             PythonTree node = context.node;
-            CompilationInfo info = context.compilationInfo;
+            PythonParserResult info = (PythonParserResult) context.parserResult;
             OffsetRange astOffsets = PythonAstUtils.getNameRange(info, node);
             OffsetRange lexOffsets = PythonLexerUtils.getLexerOffsets(info, astOffsets);
             BaseDocument doc = context.doc;
@@ -98,7 +99,7 @@ public class RelativeImports extends PythonAstRule {
                     List<HintFix> fixList = new ArrayList<HintFix>();
                     fixList.add(new RelativeImportsFix(context, imp));
                     String displayName = getDisplayName();
-                    Hint desc = new Hint(this, displayName, info.getFileObject(), lexOffsets, fixList, 1500);
+                    Hint desc = new Hint(this, displayName, info.getSnapshot().getSource().getFileObject(), lexOffsets, fixList, 1500);
                     result.add(desc);
                 }
             } catch (BadLocationException ex) {
@@ -167,9 +168,10 @@ public class RelativeImports extends PythonAstRule {
 
             OffsetRange astRange = PythonAstUtils.getRange(imp);
             if (astRange != OffsetRange.NONE) {
-                OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(context.compilationInfo, astRange);
+                PythonParserResult info = (PythonParserResult)context.parserResult;
+                OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(info, astRange);
                 if (lexRange != OffsetRange.NONE) {
-                    FileObject fo = context.compilationInfo.getFileObject();
+                    FileObject fo = info.getSnapshot().getSource().getFileObject();
                     if (fo != null) {
                         String path = imp.getInternalModule();
                         int i = 0;

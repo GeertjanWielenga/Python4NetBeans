@@ -43,7 +43,6 @@ package org.netbeans.modules.python.editor.imports;
 
 import java.awt.Toolkit;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,14 +54,14 @@ import javax.swing.text.BadLocationException;
 import org.netbeans.api.editor.EditorRegistry;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.EditList;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.EditList;
-import org.netbeans.modules.gsf.api.Index;
-import org.netbeans.modules.gsf.api.NameKind;
-import org.netbeans.modules.gsf.api.OffsetRange;
+import org.netbeans.modules.parsing.spi.indexing.support.QuerySupport;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonIndex;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.elements.IndexedElement;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
@@ -96,7 +95,7 @@ public final class ImportManager {
     static final String PREFS_KEY = FixImportsAction.class.getName();
     // TODO - use document style instead!
     static final String KEY_REMOVE_UNUSED_IMPORTS = "removeUnusedImports"; // NOI18N
-    private CompilationInfo info;
+    private PythonParserResult info;
     private List<Import> imports;
     private List<ImportFrom> importsFrom;
     private PythonTree root;
@@ -113,15 +112,15 @@ public final class ImportManager {
     private boolean removeDuplicates;
     private int rightMargin;
 
-    public ImportManager(CompilationInfo info) {
-        this(info, (BaseDocument)info.getDocument(), null);
+    public ImportManager(PythonParserResult info) {
+        this(info, GsfUtilities.getDocument(info.getSnapshot().getSource().getFileObject(), false), null);
     }
 
-    public ImportManager(CompilationInfo info, BaseDocument doc) {
+    public ImportManager(PythonParserResult info, BaseDocument doc) {
         this(info, doc, null);
     }
 
-    public ImportManager(CompilationInfo info, BaseDocument doc, CodeStyle codeStyle) {
+    public ImportManager(PythonParserResult info, BaseDocument doc, CodeStyle codeStyle) {
         this.info = info;
 
         root = PythonAstUtils.getRoot(info);
@@ -209,7 +208,7 @@ public final class ImportManager {
 
         boolean ambiguous = false;
 
-        SymbolTable symbolTable = new SymbolTable(PythonAstUtils.getRoot(info), info.getFileObject());
+        SymbolTable symbolTable = new SymbolTable(PythonAstUtils.getRoot(info), info.getSnapshot().getSource().getFileObject());
         Map<String, SymInfo> unresolved = symbolTable.getUnresolvedNames(info);
 
         if (unresolved.size() > 0) {
@@ -217,9 +216,8 @@ public final class ImportManager {
             Collections.sort(ambiguousSymbols);
 
             // Try to compute suggestions.
-            Index gsfIndex = info.getIndex(PythonTokenId.PYTHON_MIME_TYPE);
-            PythonIndex index = PythonIndex.get(gsfIndex, info.getFileObject());
-            Set<IndexedElement> modules = index.getModules("", NameKind.PREFIX);
+            PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
+            Set<IndexedElement> modules = index.getModules("", QuerySupport.Kind.PREFIX);
             for (IndexedElement module : modules) {
                 String name = module.getName();
                 if (unresolved.containsKey(name)) {
@@ -536,8 +534,7 @@ public final class ImportManager {
             removeImports(edits, filtered, cleanup == ImportCleanupStyle.COMMENT_OUT, null);
         }
 
-        Index gsfIndex = info.getIndex(PythonTokenId.PYTHON_MIME_TYPE);
-        PythonIndex index = PythonIndex.get(gsfIndex, info.getFileObject());
+        PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
 
         Collection<ImportEntry> newEntries = new ArrayList<ImportEntry>();
         if (selections != null) {
@@ -752,8 +749,7 @@ public final class ImportManager {
     public void rewriteMainImports(EditList edits, Collection<ImportEntry> newEntries, Set<ImportEntry> remove) {
         // Items to be deleted should be deleted after this
 
-        Index gsfIndex = info.getIndex(PythonTokenId.PYTHON_MIME_TYPE);
-        PythonIndex index = PythonIndex.get(gsfIndex, info.getFileObject());
+        PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
 
         // TODO:
         // Look for comments to preserve

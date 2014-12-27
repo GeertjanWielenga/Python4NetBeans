@@ -58,15 +58,14 @@ import org.netbeans.api.lexer.TokenId;
 import org.netbeans.api.lexer.TokenUtilities;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.EditList;
+import org.netbeans.modules.csl.api.Formatter;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
 import org.netbeans.modules.editor.indent.spi.Context;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.EditList;
-import org.netbeans.modules.gsf.api.Formatter;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
 import org.netbeans.modules.python.editor.imports.ImportManager;
 import org.netbeans.modules.python.editor.options.CodeStyle;
-import org.netbeans.napi.gsfret.source.SourceUtils;
 import org.openide.util.Exceptions;
 
 /**
@@ -98,7 +97,8 @@ public class PythonFormatter implements Formatter {
         this.codeStyle = codeStyle;
     }
 
-    public void reformat(Context context, CompilationInfo compilationInfo) {
+    @Override
+    public void reformat(Context context, ParserResult compilationInfo) {
 
         // No AST pretty printing yet
         // I should offer to go and do space insert/removal around commas, parentheses, etc.
@@ -107,10 +107,10 @@ public class PythonFormatter implements Formatter {
         int startOffset = context.startOffset();
         int endOffset = context.endOffset();
 
-        reformat(context, document, startOffset, endOffset, compilationInfo);
+        reformat(context, document, startOffset, endOffset, (PythonParserResult) compilationInfo);
     }
 
-    public void reformat(final Context context, Document document, int startOffset, int endOffset, CompilationInfo info) {
+    public void reformat(final Context context, Document document, int startOffset, int endOffset, PythonParserResult info) {
         if (codeStyle == null) {
             codeStyle = CodeStyle.getDefault(context.document());
         }
@@ -127,9 +127,9 @@ public class PythonFormatter implements Formatter {
     }
 
     public boolean needsParserResult() {
-        if (SourceUtils.isScanInProgress()) {
-            return false;
-        }
+//        if (SourceUtils.isScanInProgress()) {
+//            return false;
+//        }
 
         // If we're going to format imports, then yes, we need the parser result
         JTextComponent target = EditorRegistry.lastFocusedComponent();
@@ -425,7 +425,7 @@ public class PythonFormatter implements Formatter {
         return Utilities.getRowFirstNonWhite(doc, offset) == offset;
     }
 
-    private void cleanup(Document document, CompilationInfo info, int startOffset, int endOffset) {
+    private void cleanup(Document document, PythonParserResult info, int startOffset, int endOffset) {
         BaseDocument doc = (BaseDocument)document;
         final EditList edits = new EditList(doc);
         try {

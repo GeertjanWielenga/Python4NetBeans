@@ -45,7 +45,6 @@ import javax.swing.text.Document;
 import javax.swing.text.JTextComponent;
 import org.netbeans.api.editor.EditorRegistry;
 import org.netbeans.api.editor.completion.Completion;
-import org.netbeans.modules.gsf.api.Index;
 import org.netbeans.modules.python.editor.elements.Element;
 import org.netbeans.modules.python.editor.elements.IndexedElement;
 import org.netbeans.modules.python.editor.elements.IndexedMethod;
@@ -58,23 +57,22 @@ import org.netbeans.api.lexer.TokenId;
 import org.netbeans.api.lexer.TokenSequence;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.CodeCompletionContext;
+import org.netbeans.modules.csl.api.CodeCompletionHandler;
+import org.netbeans.modules.csl.api.CodeCompletionResult;
+import org.netbeans.modules.csl.api.CompletionProposal;
+import org.netbeans.modules.csl.api.ElementHandle;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.api.HtmlFormatter;
+import org.netbeans.modules.csl.api.Modifier;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.ParameterInfo;
+import org.netbeans.modules.csl.spi.DefaultCompletionProposal;
+import org.netbeans.modules.csl.spi.DefaultCompletionResult;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
-import org.netbeans.modules.gsf.api.CodeCompletionContext;
-import org.netbeans.modules.gsf.api.CodeCompletionHandler;
-import org.netbeans.modules.gsf.api.CodeCompletionResult;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.CompletionProposal;
-import org.netbeans.modules.gsf.api.ElementHandle;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.api.HtmlFormatter;
-import org.netbeans.modules.gsf.api.Modifier;
-import org.netbeans.modules.gsf.api.NameKind;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.ParameterInfo;
-import org.netbeans.modules.gsf.api.SourceModelFactory;
-import org.netbeans.modules.gsf.spi.DefaultCompletionProposal;
-import org.netbeans.modules.gsf.spi.DefaultCompletionResult;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
+import org.netbeans.modules.parsing.spi.indexing.support.QuerySupport;
 import org.netbeans.modules.python.editor.PythonParser.Sanitize;
 import org.netbeans.modules.python.editor.elements.IndexedPackage;
 import org.netbeans.modules.python.editor.imports.ImportManager;
@@ -83,7 +81,6 @@ import org.netbeans.modules.python.editor.lexer.PythonLexer;
 import org.netbeans.modules.python.editor.options.CodeStyle;
 import org.netbeans.modules.python.editor.scopes.SymbolTable;
 import org.openide.filesystems.FileObject;
-import org.openide.filesystems.FileStateInvalidException;
 import org.openide.util.Exceptions;
 import org.openide.util.ImageUtilities;
 import org.openide.util.NbBundle;
@@ -130,23 +127,13 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         "\\xhh", "Character with hex value hh",};
 
     public CodeCompletionResult complete(CodeCompletionContext context) {
-        CompilationInfo info = context.getInfo();
+        ParserResult result = context.getParserResult();
         int lexOffset = context.getCaretOffset();
         String prefix = context.getPrefix();
-        NameKind kind = context.getNameKind();
         QueryType queryType = context.getQueryType();
         this.caseSensitive = context.isCaseSensitive();
 
-        // Temporary: case insensitive matches don't work very well for JavaScript
-        if (kind == NameKind.CASE_INSENSITIVE_PREFIX) {
-            kind = NameKind.PREFIX;
-        }
-
-        if (prefix == null) {
-            prefix = "";
-        }
-
-        final Document document = info.getDocument();
+        final Document document = result.getSnapshot().getSource().getDocument(false);
         if (document == null) {
             return CodeCompletionResult.NONE;
         }
@@ -155,16 +142,16 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         List<CompletionProposal> proposals = new ArrayList<CompletionProposal>();
         DefaultCompletionResult completionResult = new PythonCompletionResult(context, proposals);
 
-        PythonParserResult parseResult = PythonAstUtils.getParseResult(info);
+        PythonParserResult parseResult = PythonAstUtils.getParseResult(result);
         doc.readLock(); // Read-lock due to Token hierarchy use
         try {
             PythonTree root = parseResult != null ? parseResult.getRoot() : null;
-            final int astOffset = PythonAstUtils.getAstOffset(info, lexOffset);
+            final int astOffset = PythonAstUtils.getAstOffset(result, lexOffset);
             if (astOffset == -1) {
                 return CodeCompletionResult.NONE;
             }
             final TokenHierarchy<Document> th = TokenHierarchy.get(document);
-            final FileObject fileObject = info.getFileObject();
+            final FileObject fileObject = result.getSnapshot().getSource().getFileObject();
             //Call call = Call.getCallType(doc, th, lexOffset);
 
             // Carry completion context around since this logic is split across lots of methods
@@ -175,22 +162,19 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
             request.result = parseResult;
             request.lexOffset = lexOffset;
             request.astOffset = astOffset;
-            request.index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE));
+            request.index = PythonIndex.get(fileObject);
             request.doc = doc;
-            request.info = info;
+            if(prefix == null) {
+                prefix = "";
+            }
             request.prefix = prefix;
             request.th = th;
-            request.kind = kind;
+            request.kind = context.isPrefixMatch()?QuerySupport.Kind.PREFIX:QuerySupport.Kind.EXACT;
             request.queryType = queryType;
             request.fileObject = fileObject;
-            request.anchor = lexOffset - prefix.length();
+            request.anchor = lexOffset - request.prefix.length();
             //request.call = call;
-
-            try {
-                request.searchUrl = request.fileObject.getURL().toExternalForm();
-            } catch (FileStateInvalidException ex) {
-                Exceptions.printStackTrace(ex);
-            }
+            request.searchUrl = request.fileObject.toURL().toExternalForm();
             if (request.searchUrl == null) {
                 request.searchUrl = "";
             }
@@ -284,7 +268,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
                     // function, so I have to account for that.
                     FunctionDef def = (FunctionDef)path.leaf();
                     OffsetRange astRange = PythonAstUtils.getRange(def);
-                    OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(info, astRange);
+                    OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(parseResult, astRange);
                     if (lexRange != OffsetRange.NONE) {
                         OffsetRange narrowed = PythonLexerUtils.narrow(doc, lexRange, true);
                         if (!narrowed.containsInclusive(lexOffset)) {
@@ -360,7 +344,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         return completionResult;
     }
 
-    public String document(CompilationInfo info, ElementHandle element) {
+    public String document(ParserResult info, ElementHandle element) {
         if (element instanceof CommentElement) {
             // Text is packaged as the name
             String rst = element.getName();
@@ -405,75 +389,72 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         if (last != null) {
             FileObject fo = GsfUtilities.findFileObject(last);
             if (fo != null) {
-                Index gsfIndex = SourceModelFactory.getInstance().getIndex(fo, PythonTokenId.PYTHON_MIME_TYPE);
-                if (gsfIndex != null) {
-                    PythonIndex index = PythonIndex.get(gsfIndex, fo);
-                    boolean isMember = link.startsWith("meth:") || link.startsWith("attr:");
-                    if (isMember || link.startsWith("func:") || link.startsWith("data:")) { // NOI18N
-                        String name = link.substring(link.indexOf(':') + 1);
-                        int paren = name.indexOf('(');
-                        if (paren != -1) {
-                            name = name.substring(0, paren);
-                        }
-                        int dot = name.indexOf('.');
-                        String cls = null;
-                        if (dot != -1) {
-                            cls = name.substring(0, dot);
-                            name = name.substring(dot + 1);
-                        }
-                        Set<IndexedElement> elements;
+                PythonIndex index = PythonIndex.get(fo);
+                boolean isMember = link.startsWith("meth:") || link.startsWith("attr:");
+                if (isMember || link.startsWith("func:") || link.startsWith("data:")) { // NOI18N
+                    String name = link.substring(link.indexOf(':') + 1);
+                    int paren = name.indexOf('(');
+                    if (paren != -1) {
+                        name = name.substring(0, paren);
+                    }
+                    int dot = name.indexOf('.');
+                    String cls = null;
+                    if (dot != -1) {
+                        cls = name.substring(0, dot);
+                        name = name.substring(dot + 1);
+                    }
+                    Set<IndexedElement> elements;
+                    if (isMember) {
+                        elements = index.getAllMembers(name, QuerySupport.Kind.EXACT, null, false);
+                    } else {
+                        elements = index.getAllElements(name, QuerySupport.Kind.EXACT, null, false);
+                    }
+                    if (elements.size() == 0) {
                         if (isMember) {
-                            elements = index.getAllMembers(name, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, null, false);
+                            elements = index.getAllElements(name, QuerySupport.Kind.EXACT, null, false);
                         } else {
-                            elements = index.getAllElements(name, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, null, false);
+                            elements = index.getAllMembers(name, QuerySupport.Kind.EXACT, null, false);
                         }
-                        if (elements.size() == 0) {
-                            if (isMember) {
-                                elements = index.getAllElements(name, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, null, false);
-                            } else {
-                                elements = index.getAllMembers(name, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, null, false);
-                            }
-                        }
-                        if (elements.size() > 0) {
-                            if (cls != null && cls.length() > 0) {
-                                for (IndexedElement element : elements) {
-                                    if (element.getIn() != null && element.getIn().equals(cls)) {
-                                        return element;
-                                    }
+                    }
+                    if (elements.size() > 0) {
+                        if (cls != null && cls.length() > 0) {
+                            for (IndexedElement element : elements) {
+                                if (element.getIn() != null && element.getIn().equals(cls)) {
+                                    return element;
                                 }
                             }
-                            // Pick the same one as the original element, if any
-                            if (originalHandle instanceof IndexedElement) {
-                                String oldUrl = ((IndexedElement)originalHandle).getFilenameUrl();
-                                for (IndexedElement element : elements) {
-                                    if (oldUrl.equals(element.getFilenameUrl())) {
-                                        return element;
-                                    }
+                        }
+                        // Pick the same one as the original element, if any
+                        if (originalHandle instanceof IndexedElement) {
+                            String oldUrl = ((IndexedElement)originalHandle).getFilenameUrl();
+                            for (IndexedElement element : elements) {
+                                if (oldUrl.equals(element.getFilenameUrl())) {
+                                    return element;
                                 }
                             }
-                            return elements.iterator().next();
                         }
-                    } else if (link.startsWith("class:") || link.startsWith("exc:")) { // NOI18N
-                        String name = link.substring(link.indexOf(':') + 1);
-                        int paren = name.indexOf('(');
-                        if (paren != -1) {
-                            name = name.substring(0, paren);
-                        }
-                        Set<IndexedElement> classes = index.getClasses(name, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, null, false);
-                        if (classes.size() > 0) {
-                            // Pick the same one as the original element, if any
-                            if (originalHandle instanceof IndexedElement) {
-                                String oldUrl = ((IndexedElement)originalHandle).getFilenameUrl();
-                                for (IndexedElement cls : classes) {
-                                    if (oldUrl.equals(cls.getFilenameUrl())) {
-                                        return cls;
-                                    }
+                        return elements.iterator().next();
+                    }
+                } else if (link.startsWith("class:") || link.startsWith("exc:")) { // NOI18N
+                    String name = link.substring(link.indexOf(':') + 1);
+                    int paren = name.indexOf('(');
+                    if (paren != -1) {
+                        name = name.substring(0, paren);
+                    }
+                    Set<IndexedElement> classes = index.getClasses(name, QuerySupport.Kind.EXACT, null, false);
+                    if (classes.size() > 0) {
+                        // Pick the same one as the original element, if any
+                        if (originalHandle instanceof IndexedElement) {
+                            String oldUrl = ((IndexedElement)originalHandle).getFilenameUrl();
+                            for (IndexedElement cls : classes) {
+                                if (oldUrl.equals(cls.getFilenameUrl())) {
+                                    return cls;
                                 }
                             }
-                            return classes.iterator().next();
                         }
-                    } // TODO: Attributes
-                }
+                        return classes.iterator().next();
+                    }
+                } // TODO: Attributes
             }
         }
 
@@ -481,9 +462,9 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
     }
 
     @SuppressWarnings("unchecked")
-    public String getPrefix(CompilationInfo info, int lexOffset, boolean upToOffset) {
+    public String getPrefix(ParserResult info, int lexOffset, boolean upToOffset) {
         try {
-            BaseDocument doc = (BaseDocument)info.getDocument();
+            BaseDocument doc = (BaseDocument)info.getSnapshot().getSource().getDocument(false);
             if (doc == null) {
                 return null;
             }
@@ -585,7 +566,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         return QueryType.NONE;
     }
 
-    public String resolveTemplateVariable(String variable, CompilationInfo info, int caretOffset, String name, Map parameters) {
+    public String resolveTemplateVariable(String variable, ParserResult info, int caretOffset, String name, Map parameters) {
         PythonParserResult parseResult = PythonAstUtils.getParseResult(info);
         if (parseResult != null) {
             // HACK: The caret offset we're passed in is bogus. It -isn't- the code template
@@ -604,7 +585,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         }
 
         if ("initialindent".equals(variable)) { // NOI18N
-            Document doc = info.getDocument();
+            Document doc = info.getSnapshot().getSource().getDocument(false);
             try {
                 int lineStart = IndentUtils.lineStartOffset(doc, Math.min(caretOffset, doc.getLength()));
                 int initial = IndentUtils.lineIndent(doc, lineStart);
@@ -614,23 +595,25 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
                 return null;
             }
         } else if ("indent".equals(variable)) { // NOI18N
-            Document doc = info.getDocument();
+            Document doc = info.getSnapshot().getSource().getDocument(false);
             return IndentUtils.createIndentString(doc, IndentUtils.indentLevelSize(doc));
         }
         return null;
     }
 
-    public Set<String> getApplicableTemplates(CompilationInfo info, int selectionBegin, int selectionEnd) {
+    @Override
+    public Set<String> getApplicableTemplates(Document info, int selectionBegin, int selectionEnd) {
         return Collections.emptySet();
     }
 
-    public ParameterInfo parameters(CompilationInfo info, int lexOffset,
+    @Override
+    public ParameterInfo parameters(ParserResult info, int lexOffset,
             CompletionProposal proposal) {
         IndexedMethod[] methodHolder = new IndexedMethod[1];
         int[] paramIndexHolder = new int[1];
         int[] anchorOffsetHolder = new int[1];
         int astOffset = PythonAstUtils.getAstOffset(info, lexOffset);
-        if (!computeMethodCall(info, lexOffset, astOffset,
+        if (!computeMethodCall((PythonParserResult) info, lexOffset, astOffset,
                 methodHolder, paramIndexHolder, anchorOffsetHolder, null)) {
 
             return ParameterInfo.NONE;
@@ -642,7 +625,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         }
         int index = paramIndexHolder[0];
         int astAnchorOffset = anchorOffsetHolder[0];
-        int anchorOffset = PythonLexerUtils.getLexerOffset(info, astAnchorOffset);
+        int anchorOffset = PythonLexerUtils.getLexerOffset((PythonParserResult) info, astAnchorOffset);
 
         // TODO: Make sure the caret offset is inside the arguments portion
         // (parameter hints shouldn't work on the method call name itself
@@ -676,8 +659,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         PythonIndex index = request.index;
         String className = classDef.getInternalName();
         String prefix = request.prefix;
-        NameKind kind = request.kind;
-        Set<IndexedElement> methods = index.getInheritedElements(className, prefix, kind);
+        Set<IndexedElement> methods = index.getInheritedElements(className, prefix, request.kind);
 
         String searchUrl = request.searchUrl;
         for (IndexedElement element : methods) {
@@ -821,7 +803,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
 
                 // User defined and library classes
                 PythonIndex index = request.index;
-                Set<IndexedElement> elements = index.getClasses(prefix, request.kind, PythonIndex.ALL_SCOPE, request.result, false);
+                Set<IndexedElement> elements = index.getClasses(prefix, request.kind, request.result, false);
                 for (IndexedElement element : elements) {
                     if (element.isNoDoc()) {
                         continue;
@@ -857,7 +839,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
 
         String prefix = request.prefix;
         int lexOffset = request.lexOffset;
-        NameKind kind = request.kind;
+        QuerySupport.Kind kind = request.kind;
 
         TokenSequence<? extends PythonTokenId> ts = PythonLexerUtils.getPositionedSequence(request.doc, lexOffset);
         if (ts == null) {
@@ -907,7 +889,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
             } else {
                 prefix = library;
             }
-            if (kind == NameKind.PREFIX || kind == NameKind.CASE_INSENSITIVE_PREFIX) {
+            if (kind == QuerySupport.Kind.PREFIX || kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX) {
                 anchor = libraryStart;
                 int length = lexOffset - libraryStart;
                 if (length >= 0 && length < prefix.length()) {
@@ -989,7 +971,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
                             }
                         }
                         Set<IndexedElement> symbols = index.getImportedElements(prefix, request.kind,
-                                PythonIndex.ALL_SCOPE, Collections.<String>singleton(library), null);
+                                Collections.<String>singleton(library), null);
                         for (IndexedElement symbol : symbols) {
                             if (!symbol.isPublic()) {
                                 continue;
@@ -1046,7 +1028,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
 
             return true;
         } else if (id == PythonTokenId.RAISE || id == PythonTokenId.EXCEPT) {
-            Set<IndexedElement> classes = index.getExceptions(prefix, kind, PythonIndex.ALL_SCOPE);
+            Set<IndexedElement> classes = index.getExceptions(prefix, kind);
             for (IndexedElement clz : classes) {
                 if (clz.isNoDoc()) {
                     continue;
@@ -1094,9 +1076,9 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
     }
 
     private boolean completeLocal(List<CompletionProposal> proposals, CompletionRequest request) {
-        CompilationInfo info = request.info;
+        PythonParserResult info = request.result;
         String prefix = request.prefix;
-        NameKind kind = request.kind;
+        QuerySupport.Kind kind = request.kind;
         org.netbeans.modules.python.editor.lexer.Call call = request.call;
 
         // Only call local and inherited methods if we don't have an LHS, such as Foo::
@@ -1205,7 +1187,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         TokenHierarchy<Document> th = request.th;
         BaseDocument doc = request.doc;
         AstPath path = request.path;
-        NameKind kind = request.kind;
+        QuerySupport.Kind kind = request.kind;
         FileObject fileObject = request.fileObject;
         PythonTree node = request.node;
 
@@ -1242,7 +1224,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
                 if (method != null) {
                     // TODO - if the lhs is "foo.bar." I need to split this
                     // up and do it a bit more cleverly
-                    PythonTypeAnalyzer analyzer = new PythonTypeAnalyzer(request.info, index, method, node, astOffset, lexOffset, fileObject);
+                    PythonTypeAnalyzer analyzer = new PythonTypeAnalyzer(request.result, index, method, node, astOffset, lexOffset, fileObject);
                     type = analyzer.getType(lhs);
 
                     if (type == null) {
@@ -1384,10 +1366,10 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
                     moduleName = lhs;
                 }
                 if (moduleCompletion) {
-                    Set<IndexedElement> modules = index.getModules(moduleName, NameKind.EXACT_NAME);
+                    Set<IndexedElement> modules = index.getModules(moduleName, QuerySupport.Kind.EXACT);
                     if (modules.size() > 0) {
                         Set<IndexedElement> symbols = index.getImportedElements(prefix, request.kind,
-                                PythonIndex.ALL_SCOPE, Collections.<String>singleton(moduleName), null);
+                                Collections.<String>singleton(moduleName), null);
                         if (symbols.size() > 0) {
                             if (elements != null && elements.size() > 0) {
                                 symbols.addAll(elements);
@@ -1426,7 +1408,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
             // Try just the method call (e.g. across all classes). This is ignoring the
             // left hand side because we can't resolve it.
             if ((elements.isEmpty())) {
-                elements = index.getAllMembers(prefix, kind, PythonIndex.ALL_SCOPE, request.result, false);
+                elements = index.getAllMembers(prefix, kind, request.result, false);
 
                 if (addSpecifyTypeItem) {
                     // Add a special code completion item to TELL us the type
@@ -1460,10 +1442,10 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
     private boolean completeClasses(List<CompletionProposal> proposals, CompletionRequest request) {
         PythonIndex index = request.index;
         String prefix = request.prefix;
-        NameKind kind = request.kind;
+        QuerySupport.Kind kind = request.kind;
         String searchUrl = request.searchUrl;
 
-        Set<IndexedElement> classes = index.getClasses(prefix, kind, PythonIndex.ALL_SCOPE, request.result, false);
+        Set<IndexedElement> classes = index.getClasses(prefix, kind, request.result, false);
         for (IndexedElement clz : classes) {
             if (clz.isNoDoc()) {
                 continue;
@@ -1484,11 +1466,11 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
     private boolean completeMethods(List<CompletionProposal> proposals, CompletionRequest request) {
         PythonIndex index = request.index;
         String prefix = request.prefix;
-        NameKind kind = request.kind;
+        QuerySupport.Kind kind = request.kind;
 
-        Set<IndexedElement> elements = index.getAllElements(prefix, kind, PythonIndex.ALL_SCOPE, request.result, false);
+        Set<IndexedElement> elements = index.getAllElements(prefix, kind, request.result, false);
         if (request.call.getLhs() != null || elements.size() == 0) {
-            Set<IndexedElement> members = index.getAllMembers(prefix, kind, PythonIndex.ALL_SCOPE, request.result, false);
+            Set<IndexedElement> members = index.getAllMembers(prefix, kind, request.result, false);
             if (members.size() > 0) {
                 elements.addAll(members);
             }
@@ -1514,10 +1496,10 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
     private boolean completeDecorators(List<CompletionProposal> proposals, CompletionRequest request) throws BadLocationException {
         PythonIndex index = request.index;
         String prefix = request.prefix;
-        NameKind kind = request.kind;
+        QuerySupport.Kind kind = request.kind;
 
         boolean found = false;
-        Set<IndexedElement> elements = index.getAllElements(prefix, kind, PythonIndex.ALL_SCOPE, request.result, false);
+        Set<IndexedElement> elements = index.getAllElements(prefix, kind, request.result, false);
         for (IndexedElement element : elements) {
             if (element.isNoDoc()) {
                 continue;
@@ -1598,7 +1580,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         Set<IndexedMethod>[] alternatesHolder = new Set[1];
         int[] paramIndexHolder = new int[1];
         int[] anchorOffsetHolder = new int[1];
-        CompilationInfo info = request.info;
+        PythonParserResult info = request.result;
         int lexOffset = request.lexOffset;
         int astOffset = request.astOffset;
 
@@ -1642,7 +1624,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
      * The argument index is returned in parameterIndexHolder[0] and the method being
      * called in methodHolder[0].
      */
-    static boolean computeMethodCall(CompilationInfo info, int lexOffset, int astOffset,
+    static boolean computeMethodCall(PythonParserResult info, int lexOffset, int astOffset,
             IndexedMethod[] methodHolder, int[] parameterIndexHolder, int[] anchorOffsetHolder,
             Set<IndexedMethod>[] alternativesHolder) {
         try {
@@ -1662,7 +1644,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
             int originalAstOffset = astOffset;
 
             // Adjust offset to the left
-            BaseDocument doc = (BaseDocument)info.getDocument();
+            BaseDocument doc = (BaseDocument) info.getSnapshot().getSource().getDocument(false);
             if (doc == null) {
                 return false;
             }
@@ -1778,7 +1760,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
                 callMethod = null;
                 return false;
             } else if (targetMethod == null) {
-                targetMethod = new PythonDeclarationFinder().findMethodDeclaration(info, call, path,
+                targetMethod = new PythonDeclarationFinder().findMethodDeclaration((PythonParserResult) info, call, path,
                         alternativesHolder);
                 if (targetMethod == null) {
                     return false;
@@ -1826,7 +1808,6 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
     private static class CompletionRequest {
         private DefaultCompletionResult completionResult;
         private TokenHierarchy<Document> th;
-        private CompilationInfo info;
         private AstPath path;
         private PythonTree node;
         private PythonTree root;
@@ -1836,7 +1817,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
         private BaseDocument doc;
         private String prefix;
         private PythonIndex index;
-        private NameKind kind;
+        private QuerySupport.Kind kind;
         private PythonParserResult result;
         private QueryType queryType;
         private FileObject fileObject;
@@ -2280,6 +2261,11 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
             anchor = request.anchor;
         }
 
+        @Override
+        public OffsetRange getOffsetRange(ParserResult pr) {
+            return null;
+        }
+
         void setHandle(ElementHandle handle) {
             this.handle = handle;
         }
@@ -2405,6 +2391,11 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
             this.request = request;
             this.call = call;
             this.lexOffset = lexOffset;
+        }
+
+        @Override
+        public OffsetRange getOffsetRange(ParserResult pr) {
+            return null;
         }
 
         public String getVariableName() {
@@ -2581,19 +2572,19 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
                     boolean packageImport = !cs.preferSymbolImports();
                     // TODO - if you're already applying this import on a LHS for an imported
                     // symbol, handle that
-                    new ImportManager(context.getInfo()).ensureImported(module, symbol, packageImport, false, false);
+                    new ImportManager((PythonParserResult) context.getParserResult()).ensureImported(module, symbol, packageImport, false, false);
 
                 } else if (call == null || call.getLhs() == null) {
                     if (pythonItem.getElement() instanceof IndexedElement) {
                         CodeStyle cs = CodeStyle.getDefault(pythonItem.request.doc);
 
                         final IndexedElement elem = (IndexedElement)pythonItem.getElement();
-                        FileObject requestFile = context.getInfo().getFileObject();
+                        FileObject requestFile = context.getParserResult().getSnapshot().getSource().getFileObject();
                         FileObject elementFile = elem.getFileObject();
                         if (elementFile != requestFile) {
                             String module = elem.getModule();
                             if (requestFile != null) {
-                                String searchModule = PythonUtils.getModuleName(requestFile, null);
+                                String searchModule = PythonUtils.getModuleName(requestFile);
                                 if (searchModule.equals(module)) {
                                     return;
                                 }
@@ -2603,7 +2594,7 @@ public class PythonCodeCompleter implements CodeCompletionHandler {
                                 boolean packageImport = !cs.preferSymbolImports();
                                 // TODO - if you're already applying this import on a LHS for an imported
                                 // symbol, handle that
-                                new ImportManager(context.getInfo()).ensureImported(module, symbol, packageImport, false, false);
+                                new ImportManager((PythonParserResult) context.getParserResult()).ensureImported(module, symbol, packageImport, false, false);
                             }
                         }
                     }

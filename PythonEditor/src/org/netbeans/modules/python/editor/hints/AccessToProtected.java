@@ -46,13 +46,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.prefs.Preferences;
 import javax.swing.JComponent;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.RuleContext;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.RuleContext;
 import org.netbeans.modules.python.editor.PythonAstUtils;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.modules.python.editor.scopes.SymInfo;
 import org.openide.util.NbBundle;
@@ -76,7 +76,7 @@ public class AccessToProtected extends PythonAstRule {
 
     @Override
     public void run(PythonRuleContext context, List<Hint> result) {
-        CompilationInfo info = context.compilationInfo;
+        PythonParserResult info = (PythonParserResult) context.parserResult;
         Attribute cur = (Attribute)context.node;
         String curAttr = cur.getInternalAttr();
         if (curAttr == null) {
@@ -101,7 +101,7 @@ public class AccessToProtected extends PythonAstRule {
                 if (range != OffsetRange.NONE) {
                     List<HintFix> fixList = Collections.emptyList();
                     String message = NbBundle.getMessage(NameRule.class, ACCESS_PROTECTED_VARIABLE, curAttr);
-                    Hint desc = new Hint(this, message, info.getFileObject(), range, fixList, 2305);
+                    Hint desc = new Hint(this, message, info.getSnapshot().getSource().getFileObject(), range, fixList, 2305);
                     result.add(desc);
                 }
             }

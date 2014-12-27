@@ -34,21 +34,33 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.swing.ImageIcon;
+import org.netbeans.modules.csl.api.ElementHandle;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.api.HtmlFormatter;
+import org.netbeans.modules.csl.api.Modifier;
+import org.netbeans.modules.csl.api.StructureItem;
 import org.netbeans.modules.python.editor.elements.AstElement;
-import org.netbeans.modules.gsf.api.ElementHandle;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.api.HtmlFormatter;
-import org.netbeans.modules.gsf.api.Modifier;
-import org.netbeans.modules.gsf.api.StructureItem;
 import org.netbeans.modules.python.editor.scopes.SymbolTable;
 import org.openide.util.ImageUtilities;
 import org.python.antlr.PythonTree;
+import org.python.antlr.ast.ClassDef;
 import org.python.antlr.ast.FunctionDef;
 
 public final class PythonStructureItem extends AstElement implements StructureItem {
     private List<PythonStructureItem> children;
     private PythonStructureItem parent;
 
+    public PythonStructureItem(SymbolTable scopes, ClassDef def) {
+        this(scopes, def, def.getInternalName(), ElementKind.CLASS);
+    }
+
+    public PythonStructureItem(SymbolTable scopes, FunctionDef def) {
+        this(scopes, def, def.getInternalName(), ElementKind.METHOD);
+        if ("__init__".equals(name)) { // NOI18N
+            kind = ElementKind.CONSTRUCTOR;
+        }
+    }
+    
     public PythonStructureItem(SymbolTable scopes, PythonTree node, String name, ElementKind kind) {
         super(scopes, node, name, kind);
         this.node = node;

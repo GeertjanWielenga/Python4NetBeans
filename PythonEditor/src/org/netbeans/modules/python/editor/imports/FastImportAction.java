@@ -58,13 +58,10 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.JTextComponent;
 import org.netbeans.editor.BaseAction;
 import org.netbeans.editor.Utilities;
-import org.netbeans.modules.gsf.api.CancellableTask;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.SourceModel;
-import org.netbeans.modules.gsf.api.SourceModelFactory;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonIndex;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
 import org.openide.ErrorManager;
 import org.openide.filesystems.FileObject;
@@ -103,29 +100,29 @@ public class FastImportAction extends BaseAction {
                 return;
             }
 
-            SourceModel model = SourceModelFactory.getInstance().getModel(file);
-            if (model != null) {
-                final CompilationInfo[] infoHolder = new CompilationInfo[1];
-                try {
-                    model.runUserActionTask(new CancellableTask<CompilationInfo>() {
-                        public void cancel() {
-                        }
-
-                        public void run(CompilationInfo info) throws Exception {
-                            importItem(info, where, caretRectangle, font, position, ident);
-                        }
-                    }, false);
-                } catch (IOException ex) {
-                    Exceptions.printStackTrace(ex);
-                }
-            }
+//            SourceModel model = SourceModelFactory.getInstance().getModel(file);
+//            if (model != null) {
+//                final CompilationInfo[] infoHolder = new CompilationInfo[1];
+//                try {
+//                    model.runUserActionTask(new CancellableTask<CompilationInfo>() {
+//                        public void cancel() {
+//                        }
+//
+//                        public void run(CompilationInfo info) throws Exception {
+//                            importItem(info, where, caretRectangle, font, position, ident);
+//                        }
+//                    }, false);
+//                } catch (IOException ex) {
+//                    Exceptions.printStackTrace(ex);
+//                }
+//            }
 
         } catch (BadLocationException ex) {
             ErrorManager.getDefault().notify(ex);
         }
     }
 
-    private void importItem(final CompilationInfo info, final Point where, final Rectangle caretRectangle, final Font font, final int position, final String ident) {
+    private void importItem(final PythonParserResult info, final Point where, final Rectangle caretRectangle, final Font font, final int position, final String ident) {
         PythonTree root = PythonAstUtils.getRoot(info);
         if (root == null) {
             Toolkit.getDefaultToolkit().beep();
@@ -133,7 +130,7 @@ public class FastImportAction extends BaseAction {
         }
 
         // Compute suggestions
-        PythonIndex index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE), info.getFileObject());
+        PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
         Set<String> modules = index.getImportsFor(ident, true);
 
         // TODO - check the file to pick a better default (based on existing imports, usages of the symbol

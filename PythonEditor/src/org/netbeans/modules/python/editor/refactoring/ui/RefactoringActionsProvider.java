@@ -47,28 +47,31 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Dictionary;
 import java.util.List;
 import javax.swing.JOptionPane;
 import javax.swing.text.JTextComponent;
 import org.netbeans.api.fileinfo.NonRecursiveFolder;
-import org.netbeans.modules.gsf.api.CancellableTask;
-import org.netbeans.napi.gsfret.source.CompilationController;
-import org.netbeans.napi.gsfret.source.CompilationInfo;
-import org.netbeans.napi.gsfret.source.Phase;
-import org.netbeans.napi.gsfret.source.Source;
+import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.parsing.api.ParserManager;
+import org.netbeans.modules.parsing.api.ResultIterator;
+import org.netbeans.modules.parsing.api.Source;
+import org.netbeans.modules.parsing.api.UserTask;
+import org.netbeans.modules.parsing.spi.ParseException;
 import org.netbeans.modules.python.editor.refactoring.PythonRefUtils;
 import org.netbeans.modules.python.editor.refactoring.PythonElementCtx;
 import org.netbeans.modules.refactoring.spi.ui.UI;
 import org.netbeans.modules.refactoring.spi.ui.ActionsImplementationProvider;
 import org.netbeans.modules.refactoring.spi.ui.RefactoringUI;
 import org.netbeans.modules.python.editor.PythonAstUtils;
+import org.netbeans.modules.python.editor.PythonIndex;
 import org.netbeans.modules.python.editor.PythonParserResult;
+import org.netbeans.modules.python.editor.PythonStructureScanner;
 import org.netbeans.modules.python.editor.PythonStructureScanner.AnalysisResult;
 import org.netbeans.modules.python.editor.PythonUtils;
 import org.netbeans.modules.python.editor.elements.AstElement;
 import org.netbeans.modules.python.editor.elements.Element;
-import org.netbeans.napi.gsfret.source.ClasspathInfo;
 import org.openide.ErrorManager;
 import org.openide.cookies.EditorCookie;
 import org.openide.filesystems.FileObject;
@@ -98,9 +101,9 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
         if (isFromEditor(ec)) {
             task = new TextComponentTask(ec) {
                 @Override
-                protected RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, int startOffset, int endOffset, final CompilationInfo info) {
+                protected RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, int startOffset, int endOffset, final PythonParserResult info) {
                     // If you're trying to rename a constructor, rename the enclosing class instead
-                    return new RenameRefactoringUI(selectedElement, info);
+                    return new RenameRefactoringUI(selectedElement);
                 }
             };
         } else {
@@ -112,12 +115,12 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
                         if (pkg[0] != null) {
                             return new RenameRefactoringUI(pkg[0], newName);
                         } else {
-                            return new RenameRefactoringUI(selectedElements[0], newName, handles == null || handles.isEmpty() ? null : handles.iterator().next(), cinfo == null ? null : cinfo.get());
+                            return new RenameRefactoringUI(selectedElements[0], newName, handles == null || handles.isEmpty() ? null : handles.iterator().next());
                         }
                     } else if (pkg[0] != null) {
                         return new RenameRefactoringUI(pkg[0]);
                     } else {
-                        return new RenameRefactoringUI(selectedElements[0], handles == null || handles.isEmpty() ? null : handles.iterator().next(), cinfo == null ? null : cinfo.get());
+                        return new RenameRefactoringUI(selectedElements[0], handles == null || handles.isEmpty() ? null : handles.iterator().next());
                     }
                 }
             };
@@ -218,14 +221,14 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
         if (isFromEditor(ec)) {
             task = new TextComponentTask(ec) {
                 @Override
-                protected RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, int startOffset, int endOffset, CompilationInfo info) {
-                    return new WhereUsedQueryUI(selectedElement, info);
+                protected RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, int startOffset, int endOffset, PythonParserResult info) {
+                    return new WhereUsedQueryUI(selectedElement);
                 }
             };
         } else {
             task = new NodeToElementTask(lookup.lookupAll(Node.class)) {
-                protected RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, CompilationInfo info) {
-                    return new WhereUsedQueryUI(selectedElement, info);
+                protected RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, PythonParserResult info) {
+                    return new WhereUsedQueryUI(selectedElement);
                 }
             };
         }
@@ -258,7 +261,7 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
     public void doMove(final Lookup lookup) {
     }
 
-    public static abstract class TextComponentTask implements Runnable, CancellableTask<CompilationController> {
+    public static abstract class TextComponentTask extends UserTask implements Runnable {
         private JTextComponent textC;
         private int caret;
         private int start;
@@ -278,45 +281,41 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
         public void cancel() {
         }
 
-        public void run(CompilationController cc) throws Exception {
-            cc.toPhase(Phase.RESOLVED);
-            PythonTree root = PythonAstUtils.getRoot(cc);
+        public void run(ResultIterator cc) throws Exception {
+            PythonTree root = PythonAstUtils.getRoot((ParserResult) cc.getParserResult());
             if (root == null) {
                 // TODO How do I add some kind of error message?
                 System.out.println("FAILURE - can't refactor uncompileable sources");
                 return;
             }
 
-            PythonElementCtx ctx = new PythonElementCtx(cc, caret);
+            PythonElementCtx ctx = new PythonElementCtx((PythonParserResult)cc.getParserResult(), caret);
             if (ctx.getSimpleName() == null) {
                 return;
             }
-            ui = createRefactoringUI(ctx, start, end, cc);
+            ui = createRefactoringUI(ctx, start, end, (PythonParserResult)cc.getParserResult());
         }
 
         public final void run() {
             FileObject fo = null;
             try {
-                Source source = PythonRefUtils.getSource(textC.getDocument());
-                source.runUserActionTask(this, false);
-                Collection<FileObject> fileObjects = source.getFileObjects();
-                if (fileObjects.size() > 0) {
-                    fo = fileObjects.iterator().next();
-                }
-            } catch (IOException ioe) {
-                ErrorManager.getDefault().notify(ioe);
+                Source source = Source.create(textC.getDocument());
+                ParserManager.parse(Collections.singleton(source), this);
+                fo = source.getFileObject();
+            } catch (ParseException ex) {
+                ErrorManager.getDefault().notify(ex);
                 return;
             }
             TopComponent activetc = TopComponent.getRegistry().getActivated();
 
             if (ui != null) {
-                if (fo != null) {
-                    ClasspathInfo classpathInfoFor = PythonRefUtils.getClasspathInfoFor(fo);
-                    if (classpathInfoFor == null) {
-                        JOptionPane.showMessageDialog(null, NbBundle.getMessage(RefactoringActionsProvider.class, "ERR_CannotFindClasspath"));
-                        return;
-                    }
-                }
+//                if (fo != null) {
+//                    ClasspathInfo classpathInfoFor = PythonRefUtils.getClasspathInfoFor(fo);
+//                    if (classpathInfoFor == null) {
+//                        JOptionPane.showMessageDialog(null, NbBundle.getMessage(RefactoringActionsProvider.class, "ERR_CannotFindClasspath"));
+//                        return;
+//                    }
+//                }
 
                 UI.openRefactoringUI(ui, activetc);
             } else {
@@ -328,10 +327,10 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
             }
         }
 
-        protected abstract RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, int startOffset, int endOffset, CompilationInfo info);
+        protected abstract RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, int startOffset, int endOffset, PythonParserResult info);
     }
 
-    public static abstract class NodeToElementTask implements Runnable, CancellableTask<CompilationController> {
+    public static abstract class NodeToElementTask extends UserTask implements Runnable {
         private Node node;
         private RefactoringUI ui;
 
@@ -343,38 +342,35 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
         public void cancel() {
         }
 
-        public void run(CompilationController info) throws Exception {
-            info.toPhase(Phase.ELEMENTS_RESOLVED);
-            PythonTree root = PythonAstUtils.getRoot(info);
+        public void run(ResultIterator info) throws Exception {
+            PythonTree root = PythonAstUtils.getRoot((ParserResult) info.getParserResult());
             if (root != null) {
-                Element element = AstElement.create(info, root);
-                PythonElementCtx fileCtx = new PythonElementCtx(root, root, element, info.getFileObject(), info);
-                ui = createRefactoringUI(fileCtx, info);
+                Element element = AstElement.create((PythonParserResult) info.getParserResult(), root);
+                PythonElementCtx fileCtx = new PythonElementCtx(root, root, element, info.getSnapshot().getSource().getFileObject(), (PythonParserResult) info.getParserResult());
+                ui = createRefactoringUI(fileCtx, (PythonParserResult) info.getParserResult());
             }
         }
 
         public final void run() {
             DataObject o = node.getCookie(DataObject.class);
-            Source source = PythonRefUtils.getSource(o.getPrimaryFile());
+            Source source = Source.create(o.getPrimaryFile());
             assert source != null;
             try {
-                source.runUserActionTask(this, false);
-            } catch (IllegalArgumentException ex) {
-                ex.printStackTrace();
-            } catch (IOException ex) {
+                ParserManager.parse(Collections.singleton(source), this);
+            } catch (ParseException ex) {
                 ex.printStackTrace();
             }
             UI.openRefactoringUI(ui);
         }
 
-        protected abstract RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, CompilationInfo info);
+        protected abstract RefactoringUI createRefactoringUI(PythonElementCtx selectedElement, PythonParserResult info);
     }
 
-    public static abstract class NodeToFileObjectTask implements Runnable, CancellableTask<CompilationController> {
+    public static abstract class NodeToFileObjectTask extends UserTask implements Runnable {
         private Collection<? extends Node> nodes;
         private RefactoringUI ui;
         public NonRecursiveFolder pkg[];
-        public WeakReference<CompilationInfo> cinfo;
+        public WeakReference<ResultIterator> cinfo;
         Collection<PythonElementCtx> handles = new ArrayList<PythonElementCtx>();
 
         public NodeToFileObjectTask(Collection<? extends Node> nodes) {
@@ -384,13 +380,12 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
         public void cancel() {
         }
 
-        public void run(CompilationController info) throws Exception {
-            info.toPhase(Phase.ELEMENTS_RESOLVED);
-            PythonTree root = PythonAstUtils.getRoot(info);
+        public void run(ResultIterator info) throws Exception {
+            PythonTree root = PythonAstUtils.getRoot((ParserResult) info.getParserResult());
             if (root != null) {
-                PythonParserResult rpr = PythonAstUtils.getParseResult(info);
+                PythonParserResult rpr = PythonAstUtils.getParseResult((ParserResult) info.getParserResult());
                 if (rpr != null) {
-                    AnalysisResult ar = rpr.getStructure();
+                    AnalysisResult ar = PythonStructureScanner.analyze(rpr);
                     List<? extends AstElement> els = ar.getElements();
                     if (els.size() > 0) {
                         // TODO - try to find the outermost or most "relevant" module/class in the file?
@@ -398,14 +393,14 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
                         // It's not as simple in Python.
                         AstElement element = els.get(0);
                         PythonTree node = element.getNode();
-                        PythonElementCtx representedObject = new PythonElementCtx(root, node, element, info.getFileObject(), info);
+                        PythonElementCtx representedObject = new PythonElementCtx(root, node, element, info.getParserResult().getSnapshot().getSource().getFileObject(), (PythonParserResult) info.getParserResult());
                         //representedObject.setNames(element.getFqn(), element.getName());
                         representedObject.setNames(element.getIn() + "." + element.getName(), element.getName());
                         handles.add(representedObject);
                     }
                 }
             }
-            cinfo = new WeakReference<CompilationInfo>(info);
+            cinfo = new WeakReference<ResultIterator>(info);
         }
 
         public void run() {
@@ -416,16 +411,14 @@ public class RefactoringActionsProvider extends ActionsImplementationProvider {
                 DataObject dob = node.getCookie(DataObject.class);
                 if (dob != null) {
                     fobs[i] = dob.getPrimaryFile();
-                    Source source = PythonRefUtils.getSource(fobs[i]);
+                    Source source = Source.create(fobs[i]);
                     if (source == null) {
                         continue;
                     }
                     assert source != null;
                     try {
-                        source.runUserActionTask(this, false);
-                    } catch (IllegalArgumentException ex) {
-                        ex.printStackTrace();
-                    } catch (IOException ex) {
+                        ParserManager.parse(Collections.singleton(source), this);
+                    } catch (ParseException ex) {
                         ex.printStackTrace();
                     }
 

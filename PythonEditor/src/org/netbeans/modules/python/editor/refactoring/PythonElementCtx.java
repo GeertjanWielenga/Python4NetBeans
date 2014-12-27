@@ -32,13 +32,14 @@ package org.netbeans.modules.python.editor.refactoring;
 
 import java.util.Iterator;
 
-import org.netbeans.modules.gsf.api.ElementKind;
 import org.netbeans.modules.python.editor.elements.AstElement;
 import org.netbeans.modules.python.editor.elements.Element;
-import org.netbeans.napi.gsfret.source.CompilationInfo;
 import org.netbeans.editor.BaseDocument;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.python.editor.AstPath;
 import org.netbeans.modules.python.editor.PythonAstUtils;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.elements.IndexedElement;
 import org.openide.filesystems.FileObject;
 import org.python.antlr.PythonTree;
@@ -62,7 +63,7 @@ import org.python.antlr.ast.Name;
 public class PythonElementCtx {
     private PythonTree node;
     private PythonTree root;
-    private CompilationInfo info;
+    private PythonParserResult info;
     private FileObject fileObject;
     private AstPath path;
     private int caret;
@@ -79,12 +80,12 @@ public class PythonElementCtx {
     private String defClass;
 
     public PythonElementCtx(PythonTree root, PythonTree node, Element element, FileObject fileObject,
-            CompilationInfo info) {
+            PythonParserResult info) {
         initialize(root, node, element, fileObject, info);
     }
 
     /** Create a new element holder representing the node closest to the given caret offset in the given compilation job */
-    public PythonElementCtx(CompilationInfo info, int caret) {
+    public PythonElementCtx(PythonParserResult info, int caret) {
         PythonTree root = PythonAstUtils.getRoot(info);
 
         int astOffset = PythonAstUtils.getAstOffset(info, caret);
@@ -117,7 +118,7 @@ public class PythonElementCtx {
         }
         Element element = AstElement.create(info, leaf);
 
-        initialize(root, leaf, element, info.getFileObject(), info);
+        initialize(root, leaf, element, info.getSnapshot().getSource().getFileObject(), info);
 
         //        name = element.getFqn();
         name = element.getName();
@@ -132,20 +133,20 @@ public class PythonElementCtx {
     }
 
     public PythonElementCtx(IndexedElement element) {
-        CompilationInfo[] infoHolder = new CompilationInfo[1];
+        PythonParserResult[] infoHolder = new PythonParserResult[1];
         PythonTree node = PythonAstUtils.getForeignNode(element, infoHolder);
-        CompilationInfo info = infoHolder[0];
+        PythonParserResult info = infoHolder[0];
 
         Element e = AstElement.create(info, node);
 
         FileObject fo = element.getFileObject();
-        document = PythonRefUtils.getDocument(null, fo);
+        document = GsfUtilities.getDocument(fileObject, false);
 
         initialize(root, node, e, fo, info);
     }
 
     private void initialize(PythonTree root, PythonTree node, Element element, FileObject fileObject,
-            CompilationInfo info) {
+            PythonParserResult info) {
         this.root = root;
         this.node = node;
         this.element = element;
@@ -209,7 +210,7 @@ public class PythonElementCtx {
         this.node = node;
     }
 
-    public CompilationInfo getInfo() {
+    public PythonParserResult getInfo() {
         return info;
     }
 
@@ -267,7 +268,7 @@ public class PythonElementCtx {
 //    }
     public BaseDocument getDocument() {
         if (document == null) {
-            document = PythonRefUtils.getDocument(info, info.getFileObject());
+            document = GsfUtilities.getDocument(info.getSnapshot().getSource().getFileObject(), false);
         }
 
         return document;

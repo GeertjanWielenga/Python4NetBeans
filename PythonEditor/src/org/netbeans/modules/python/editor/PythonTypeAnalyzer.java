@@ -38,8 +38,7 @@ import org.netbeans.api.lexer.LanguagePath;
 import org.netbeans.api.lexer.TokenHierarchy;
 import org.netbeans.api.lexer.TokenSequence;
 import org.netbeans.editor.BaseDocument;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.OffsetRange;
+import org.netbeans.modules.csl.api.OffsetRange;
 import org.netbeans.modules.python.editor.lexer.PythonCommentTokenId;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
@@ -117,12 +116,12 @@ public class PythonTypeAnalyzer {
     /** PythonTree we are looking for;  */
     private PythonTree target;
     private final FileObject fileObject;
-    private final CompilationInfo info;
+    private final PythonParserResult info;
     private long startTime;
 
     /** Creates a new instance of JsTypeAnalyzer for a given position.
      * The {@link #analyze} method will do the rest. */
-    public PythonTypeAnalyzer(CompilationInfo info, PythonIndex index, PythonTree root, PythonTree target, int astOffset, int lexOffset, FileObject fileObject) {
+    public PythonTypeAnalyzer(PythonParserResult info, PythonIndex index, PythonTree root, PythonTree target, int astOffset, int lexOffset, FileObject fileObject) {
         this.info = info;
         this.index = index;
         this.root = root;
@@ -722,7 +721,7 @@ public class PythonTypeAnalyzer {
 
             if (info != null && root != null) {
                 // Look for type annotations
-                BaseDocument doc = (BaseDocument)info.getDocument();
+                BaseDocument doc = (BaseDocument) info.getSnapshot().getSource().getDocument(false);
                 if (doc != null) {
                     // Look for type declarations that can apply to this variable
                     OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(info, PythonAstUtils.getRange(root));

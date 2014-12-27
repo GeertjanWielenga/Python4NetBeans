@@ -47,14 +47,14 @@ import java.util.Collections;
 import java.util.Set;
 import javax.swing.Icon;
 import javax.swing.text.Position.Bias;
-import org.netbeans.modules.gsf.api.Modifier;
-
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.napi.gsfret.source.CompilationInfo;
-import org.netbeans.napi.gsfret.source.UiUtils;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.Modifier;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.UiUtils;
+import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.python.editor.PythonAstUtils;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.modules.python.editor.refactoring.ui.ElementGripFactory;
 import org.netbeans.modules.refactoring.spi.SimpleRefactoringElementImplementation;
@@ -115,7 +115,7 @@ public class WhereUsedElement extends SimpleRefactoringElementImplementation {
     }
 
     public static WhereUsedElement create(PythonElementCtx tree) {
-        CompilationInfo info = tree.getInfo();
+        PythonParserResult info = tree.getInfo();
         OffsetRange range = PythonAstUtils.getNameRange(info, tree.getNode());
         assert range != OffsetRange.NONE;
 
@@ -130,8 +130,8 @@ public class WhereUsedElement extends SimpleRefactoringElementImplementation {
         return create(info, tree.getName(), range, icon);
     }
 
-    public static WhereUsedElement create(CompilationInfo info, String name, OffsetRange range, Icon icon) {
-        FileObject fo = info.getFileObject();
+    public static WhereUsedElement create(PythonParserResult info, String name, OffsetRange range, Icon icon) {
+        FileObject fo = info.getSnapshot().getSource().getFileObject();
         int start = range.getStart();
         int end = range.getEnd();
 
@@ -139,7 +139,7 @@ public class WhereUsedElement extends SimpleRefactoringElementImplementation {
         int en = start; // ! Same line as start
         String content = null;
 
-        BaseDocument bdoc = PythonRefUtils.getDocument(info, info.getFileObject());
+        BaseDocument bdoc = GsfUtilities.getDocument(info.getSnapshot().getSource().getFileObject(), false);
         try {
             bdoc.readLock();
 
@@ -204,8 +204,8 @@ public class WhereUsedElement extends SimpleRefactoringElementImplementation {
                 new OffsetRange(start, end), icon);
     }
 
-    public static WhereUsedElement create(CompilationInfo info, String name, String html, OffsetRange range, Icon icon) {
-        FileObject fo = info.getFileObject();
+    public static WhereUsedElement create(PythonParserResult info, String name, String html, OffsetRange range, Icon icon) {
+        FileObject fo = info.getSnapshot().getSource().getFileObject();
         int start = range.getStart();
         int end = range.getEnd();
 

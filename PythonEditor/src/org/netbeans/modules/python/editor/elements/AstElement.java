@@ -31,10 +31,13 @@
 package org.netbeans.modules.python.editor.elements;
 
 import java.util.Set;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.api.Modifier;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.api.Modifier;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.python.editor.PythonAstUtils;
+import org.netbeans.modules.python.editor.PythonParserResult;
+import org.netbeans.modules.python.editor.PythonStructureItem;
 import org.netbeans.modules.python.editor.PythonStructureScanner;
 import org.netbeans.modules.python.editor.scopes.SymbolTable;
 import org.python.antlr.PythonTree;
@@ -64,13 +67,13 @@ public class AstElement extends Element {
         this.kind = kind;
     }
 
-    public static AstElement create(CompilationInfo info, PythonTree node) {
-        SymbolTable scopes = PythonAstUtils.getParseResult(info).getSymbolTable();
+    public static AstElement create(PythonParserResult result, PythonTree node) {
+        SymbolTable scopes = result.getSymbolTable();
 
         if (node instanceof FunctionDef) {
-            return PythonStructureScanner.create(scopes, (FunctionDef)node);
+            return new PythonStructureItem(scopes, (FunctionDef)node);
         } else if (node instanceof ClassDef) {
-            return PythonStructureScanner.create(scopes, (ClassDef)node);
+            return new PythonStructureItem(scopes, (ClassDef)node);
         } else if (node instanceof Call) {
             String name = PythonAstUtils.getCallName((Call)node);
             return new AstElement(scopes, node, name, ElementKind.METHOD);

@@ -36,9 +36,9 @@ import javax.swing.text.Document;
 import org.netbeans.api.lexer.Token;
 import org.netbeans.api.lexer.TokenSequence;
 import org.netbeans.editor.BaseDocument;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.InstantRenamer;
-import org.netbeans.modules.gsf.api.OffsetRange;
+import org.netbeans.modules.csl.api.InstantRenamer;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
 import org.netbeans.modules.python.editor.lexer.PythonCommentTokenId;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
@@ -54,7 +54,8 @@ import org.python.antlr.ast.Name;
  * @author Tor Norbye
  */
 public class PythonInstantRename implements InstantRenamer {
-    public boolean isRenameAllowed(CompilationInfo info, int caretOffset, String[] explanationRetValue) {
+    
+    public boolean isRenameAllowed(ParserResult info, int caretOffset, String[] explanationRetValue) {
         if (findVarName(info, caretOffset) != null) {
             return true;
         }
@@ -79,8 +80,8 @@ public class PythonInstantRename implements InstantRenamer {
         return false;
     }
 
-    private TokenSequence<PythonCommentTokenId> findVarName(CompilationInfo info, int caretOffset) {
-        Document document = info.getDocument();
+    private TokenSequence<PythonCommentTokenId> findVarName(ParserResult info, int caretOffset) {
+        Document document = info.getSnapshot().getSource().getDocument(false);
         if (document != null) {
             BaseDocument doc = (BaseDocument)document;
             TokenSequence<? extends PythonTokenId> ts = PythonLexerUtils.getPositionedSequence(doc, caretOffset);
@@ -106,12 +107,12 @@ public class PythonInstantRename implements InstantRenamer {
         return null;
     }
 
-    public Set<OffsetRange> getRenameRegions(CompilationInfo info, int caretOffset) {
+    public Set<OffsetRange> getRenameRegions(ParserResult info, int caretOffset) {
         TokenSequence<PythonCommentTokenId> embedded = findVarName(info, caretOffset);
         if (embedded != null) {
             Token<PythonCommentTokenId> token = embedded.token();
             String name = token.text().toString();
-            Set<OffsetRange> offsets = PythonAstUtils.getAllOffsets(info, null, caretOffset, name, true);
+            Set<OffsetRange> offsets = PythonAstUtils.getAllOffsets((PythonParserResult) info, null, caretOffset, name, true);
             if (offsets != null) {
                 return offsets;
             }
@@ -127,7 +128,7 @@ public class PythonInstantRename implements InstantRenamer {
             String name = null;
             if (leaf instanceof Name) {
                 name = ((Name)leaf).getInternalId();
-                Set<OffsetRange> offsets = PythonAstUtils.getAllOffsets(info, path, caretOffset, name, true);
+                Set<OffsetRange> offsets = PythonAstUtils.getAllOffsets((PythonParserResult) info, path, caretOffset, name, true);
                 if (offsets != null) {
                     return offsets;
                 }

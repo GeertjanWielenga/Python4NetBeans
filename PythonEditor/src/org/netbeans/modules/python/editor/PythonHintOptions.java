@@ -30,9 +30,9 @@
  */
 package org.netbeans.modules.python.editor;
 
+import org.netbeans.modules.csl.api.HintsProvider;
+import org.netbeans.modules.csl.api.HintsProvider.HintsManager;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
-import org.netbeans.modules.gsf.api.HintsProvider;
-import org.netbeans.modules.gsf.api.HintsProvider.HintsManager;
 import org.netbeans.spi.options.AdvancedOption;
 import org.netbeans.spi.options.OptionsPanelController;
 import org.openide.util.NbBundle;
@@ -43,17 +43,20 @@ import org.openide.util.NbBundle;
 public class PythonHintOptions extends AdvancedOption {
     OptionsPanelController panelController;
 
+    @Override
     public String getDisplayName() {
         return NbBundle.getMessage(PythonHintOptions.class, "CTL_Hints_DisplayName"); // NOI18N
     }
 
+    @Override
     public String getTooltip() {
         return NbBundle.getMessage(PythonHintOptions.class, "CTL_Hints_ToolTip"); // NOI18N
     }
 
+    @Override
     public synchronized OptionsPanelController create() {
         if (panelController == null) {
-            HintsManager manager = HintsProvider.Factory.getManager(PythonTokenId.PYTHON_MIME_TYPE);
+            HintsManager manager = HintsProvider.HintsManager.getManagerForMimeType(PythonTokenId.PYTHON_MIME_TYPE);
             assert manager != null;
             panelController = manager.getOptionsController();
         }

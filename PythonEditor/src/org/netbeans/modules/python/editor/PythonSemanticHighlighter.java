@@ -34,12 +34,16 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.netbeans.modules.gsf.api.ColoringAttributes;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.SemanticAnalyzer;
+import org.netbeans.modules.csl.api.ColoringAttributes;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.SemanticAnalyzer;
+import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.parsing.spi.Parser.Result;
+import org.netbeans.modules.parsing.spi.Scheduler;
+import org.netbeans.modules.parsing.spi.SchedulerEvent;
 import org.netbeans.modules.python.editor.scopes.ScopeInfo;
 import org.netbeans.modules.python.editor.scopes.SymbolTable;
+import org.openide.util.Exceptions;
 import org.python.antlr.PythonTree;
 import org.python.antlr.Visitor;
 import org.python.antlr.ast.ClassDef;
@@ -52,7 +56,7 @@ import org.python.antlr.ast.Name;
  *
  * @author Tor Norbye
  */
-public class PythonSemanticHighlighter implements SemanticAnalyzer {
+public class PythonSemanticHighlighter extends SemanticAnalyzer<PythonParserResult> {
     private boolean cancelled;
     private Map<OffsetRange, Set<ColoringAttributes>> semanticHighlights;
 
@@ -72,34 +76,47 @@ public class PythonSemanticHighlighter implements SemanticAnalyzer {
         cancelled = true;
     }
 
-    public void run(CompilationInfo info) throws Exception {
+    @Override
+    public int getPriority() {
+        return 0;
+    }
+
+    @Override
+    public Class<? extends Scheduler> getSchedulerClass() {
+        return Scheduler.EDITOR_SENSITIVE_TASK_SCHEDULER;
+    }
+    
+    public void run(PythonParserResult pr, SchedulerEvent event) {
         resume();
 
         if (isCancelled()) {
             return;
         }
 
-        PythonTree root = PythonAstUtils.getRoot(info);
+        PythonTree root = PythonAstUtils.getRoot(pr);
         if (root == null) {
             return;
         }
 
-        PythonParserResult pr = PythonAstUtils.getParseResult(info);
         SymbolTable symbolTable = pr.getSymbolTable();
 
-        SemanticVisitor visitor = new SemanticVisitor(info, symbolTable);
-        visitor.visit(root);
+        SemanticVisitor visitor = new SemanticVisitor(pr, symbolTable);
+        try {
+            visitor.visit(root);
+        } catch (Exception ex) {
+            Exceptions.printStackTrace(ex);
+        }
         semanticHighlights = visitor.getHighlights();
     }
 
     private static class SemanticVisitor extends Visitor {
-        private final CompilationInfo info;
+        private final PythonParserResult info;
         private Map<OffsetRange, Set<ColoringAttributes>> highlights =
                 new HashMap<OffsetRange, Set<ColoringAttributes>>(100);
         private final SymbolTable symbolTable;
         private ScopeInfo scope;
 
-        SemanticVisitor(CompilationInfo info, SymbolTable symbolTable) {
+        SemanticVisitor(PythonParserResult info, SymbolTable symbolTable) {
             this.info = info;
             this.symbolTable = symbolTable;
         }

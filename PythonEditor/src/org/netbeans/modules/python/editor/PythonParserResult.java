@@ -30,23 +30,16 @@
  */
 package org.netbeans.modules.python.editor;
 
-import java.io.IOException;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
-import javax.swing.text.Document;
-import org.netbeans.modules.python.editor.lexer.PythonTokenId;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.Error;
-import org.netbeans.modules.gsf.api.Index;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.ParserFile;
-import org.netbeans.modules.gsf.api.ParserResult;
-import org.netbeans.modules.gsf.api.annotations.NonNull;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
+import org.netbeans.api.annotations.common.NonNull;
+import org.netbeans.modules.csl.api.Error;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.parsing.api.Snapshot;
 import org.netbeans.modules.python.editor.PythonParser.Sanitize;
 import org.netbeans.modules.python.editor.scopes.SymbolTable;
-import org.openide.util.Exceptions;
 import org.python.antlr.PythonTree;
 
 /**
@@ -57,6 +50,7 @@ import org.python.antlr.PythonTree;
  */
 public class PythonParserResult extends ParserResult {
     private PythonTree root;
+    private List<Error> errors;
     private OffsetRange sanitizedRange = OffsetRange.NONE;
     private String source;
     private String sanitizedContents;
@@ -65,9 +59,10 @@ public class PythonParserResult extends ParserResult {
     private SymbolTable symbolTable;
     private int codeTemplateOffset = -1;
 
-    public PythonParserResult(PythonTree tree, PythonParser parser, ParserFile file, boolean isValid) {
-        super(parser, file, PythonTokenId.PYTHON_MIME_TYPE, isValid);
+    public PythonParserResult(PythonTree tree, @NonNull Snapshot snapshot) {
+        super(snapshot);
         this.root = tree;
+        this.errors = new LinkedList<Error>();
     }
 
     public PythonTree getRoot() {
@@ -75,10 +70,19 @@ public class PythonParserResult extends ParserResult {
     }
 
     @Override
-    public AstTreeNode getAst() {
-        return PythonAstTreeNode.get(root);
+    public List<? extends Error> getDiagnostics() {
+        return errors;
     }
 
+    @Override
+    protected void invalidate() {
+    }
+
+    public void setErrors(List<? extends Error> errors) {
+        this.errors.clear();
+        this.errors.addAll(errors);
+    }
+    
     /**
      * Set the range of source that was sanitized, if any.
      */
@@ -107,7 +111,7 @@ public class PythonParserResult extends ParserResult {
 
     public SymbolTable getSymbolTable() {
         if (symbolTable == null) {
-            symbolTable = new SymbolTable(root, file.getFileObject());
+            symbolTable = new SymbolTable(root, getSnapshot().getSource().getFileObject());
         }
 
         return symbolTable;
@@ -125,68 +129,6 @@ public class PythonParserResult extends ParserResult {
         this.source = source;
     }
 
-    void setStructure(@NonNull PythonStructureScanner.AnalysisResult result) {
-        this.analysisResult = result;
-    }
-
-    @NonNull
-    public PythonStructureScanner.AnalysisResult getStructure() {
-        if (analysisResult == null) {
-            CompilationInfo info = getInfo();
-            if (info == null) {
-                try {
-                    info = new CompilationInfo(getFile().getFileObject()) {
-                        private Document doc;
-
-                        @Override
-                        public Collection<? extends ParserResult> getEmbeddedResults(String mimeType) {
-                            if (mimeType.equals(PythonTokenId.PYTHON_MIME_TYPE)) {
-                                return Collections.singleton(PythonParserResult.this);
-                            }
-                            return null;
-                        }
-
-                        @Override
-                        public ParserResult getEmbeddedResult(String mimeType, int offset) {
-                            if (mimeType.equals(PythonTokenId.PYTHON_MIME_TYPE)) {
-                                return PythonParserResult.this;
-                            }
-                            return null;
-                        }
-
-                        @Override
-                        public String getText() {
-                            return getSource();
-                        }
-
-                        @Override
-                        public Index getIndex(String mimeType) {
-                            return null;
-                        }
-
-                        @Override
-                        public List<Error> getErrors() {
-                            return Collections.emptyList();
-                        }
-
-                        @Override
-                        public Document getDocument() {
-                            if (doc == null) {
-                                doc = GsfUtilities.getDocument(getFileObject(), true);
-                            }
-
-                            return doc;
-                        }
-                    };
-                } catch (IOException ioe) {
-                    Exceptions.printStackTrace(ioe);
-                }
-            }
-            analysisResult = PythonStructureScanner.analyze(info);
-        }
-        return analysisResult;
-    }
-
     /**
      * @return the codeTemplateOffset
      */
@@ -199,5 +141,13 @@ public class PythonParserResult extends ParserResult {
      */
     public void setCodeTemplateOffset(int codeTemplateOffset) {
         this.codeTemplateOffset = codeTemplateOffset;
+    }
+
+    public void addError(Error e) {
+        errors.add(e);
+    }
+
+    public boolean isValid() {
+        return errors.isEmpty();
     }
 }

@@ -38,7 +38,7 @@ import org.python.antlr.PythonTree;
  * 
  * @author Tor Norbye
  */
-public class PythonRuleContext extends org.netbeans.modules.gsf.api.RuleContext {
+public class PythonRuleContext extends org.netbeans.modules.csl.api.RuleContext {
     public AstPath path;
     public PythonTree node;
     public boolean remove;

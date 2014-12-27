@@ -46,12 +46,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.prefs.Preferences;
 import javax.swing.JComponent;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.RuleContext;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.RuleContext;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
@@ -76,7 +75,7 @@ public class AttributeDefinedOutsideInit extends PythonAstRule {
 
     @Override
     public void run(PythonRuleContext context, List<Hint> result) {
-        CompilationInfo info = context.compilationInfo;
+        PythonParserResult info = (PythonParserResult) context.parserResult;
         PythonParserResult pr = PythonAstUtils.getParseResult(info);
         SymbolTable symbolTable = pr.getSymbolTable();
 
@@ -91,7 +90,7 @@ public class AttributeDefinedOutsideInit extends PythonAstRule {
                     String message = NbBundle.getMessage(NameRule.class,
                             ATTRIBUTE_DEFINED_OUTSITE_INIT_VAR,
                             cur.getInternalAttr());
-                    Hint desc = new Hint(this, message, info.getFileObject(), range, fixList, 2305);
+                    Hint desc = new Hint(this, message, info.getSnapshot().getSource().getFileObject(), range, fixList, 2305);
                     result.add(desc);
                 }
             }

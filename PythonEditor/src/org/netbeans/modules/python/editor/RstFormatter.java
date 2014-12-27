@@ -57,10 +57,10 @@ import org.netbeans.api.lexer.Token;
 import org.netbeans.api.lexer.TokenHierarchy;
 import org.netbeans.api.lexer.TokenSequence;
 import org.netbeans.editor.BaseDocument;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.ElementHandle;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
+import org.netbeans.modules.csl.api.ElementHandle;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.python.editor.elements.Element;
 import org.netbeans.modules.python.editor.elements.IndexedElement;
 import org.netbeans.modules.python.editor.elements.IndexedMethod;
@@ -1001,7 +1001,7 @@ public class RstFormatter {
         return -1;
     }
 
-    public static String document(CompilationInfo info, ElementHandle element) {
+    public static String document(ParserResult info, ElementHandle element) {
         if (element instanceof IndexedElement) {
             IndexedElement indexedElement = (IndexedElement)element;
 
@@ -1024,7 +1024,7 @@ public class RstFormatter {
         return null;
     }
 
-    public static String document(CompilationInfo info, PythonTree node, IndexedElement element) {
+    public static String document(ParserResult info, PythonTree node, IndexedElement element) {
         if (node != null) {
             String doc = PythonAstUtils.getDocumentation(node);
             if (doc != null) {

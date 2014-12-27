@@ -47,16 +47,16 @@ import org.netbeans.api.lexer.Token;
 import org.netbeans.api.lexer.TokenSequence;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.EditList;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.PreviewableFix;
+import org.netbeans.modules.csl.api.RuleContext;
+import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.EditList;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.PreviewableFix;
-import org.netbeans.modules.gsf.api.RuleContext;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
 import org.python.antlr.PythonTree;
@@ -89,7 +89,7 @@ public class CreateDocString extends PythonAstRule {
         }
 
         // Create new fix
-        CompilationInfo info = context.compilationInfo;
+        PythonParserResult info = (PythonParserResult) context.parserResult;
         OffsetRange astOffsets = PythonAstUtils.getNameRange(info, node);
         OffsetRange lexOffsets = PythonLexerUtils.getLexerOffsets(info, astOffsets);
         BaseDocument doc = context.doc;
@@ -102,7 +102,7 @@ public class CreateDocString extends PythonAstRule {
                 fixList.add(new CreateDocStringFix(context, node, !singleIsDefault));
                 fixList.add(new CreateDocStringFix(context, node, singleIsDefault));
                 String displayName = getDisplayName();
-                Hint desc = new Hint(this, displayName, info.getFileObject(), lexOffsets, fixList, 1500);
+                Hint desc = new Hint(this, displayName, info.getSnapshot().getSource().getFileObject(), lexOffsets, fixList, 1500);
                 result.add(desc);
             }
         } catch (BadLocationException ex) {
@@ -168,7 +168,7 @@ public class CreateDocString extends PythonAstRule {
 
             OffsetRange astRange = PythonAstUtils.getRange(node);
             if (astRange != OffsetRange.NONE) {
-                OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(context.compilationInfo, astRange);
+                OffsetRange lexRange = PythonLexerUtils.getLexerOffsets((PythonParserResult) context.parserResult, astRange);
                 if (lexRange != OffsetRange.NONE) {
                     // Find the colon
                     TokenSequence<? extends PythonTokenId> ts = PythonLexerUtils.getPositionedSequence(doc, lexRange.getStart());
@@ -209,7 +209,7 @@ public class CreateDocString extends PythonAstRule {
             Position pos = edits.createPosition(editListPosition);
             edits.apply();
             if (pos != null && pos.getOffset() != -1) {
-                JTextComponent target = GsfUtilities.getPaneFor(context.compilationInfo.getFileObject());
+                JTextComponent target = GsfUtilities.getPaneFor(context.parserResult.getSnapshot().getSource().getFileObject());
                 if (target != null) {
                     target.setCaretPosition(pos.getOffset());
                 }

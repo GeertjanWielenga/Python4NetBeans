@@ -43,10 +43,13 @@ import org.netbeans.api.lexer.Token;
 import org.netbeans.api.lexer.TokenSequence;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
-import org.netbeans.modules.gsf.api.ColoringAttributes;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.OccurrencesFinder;
-import org.netbeans.modules.gsf.api.OffsetRange;
+import org.netbeans.modules.csl.api.ColoringAttributes;
+import org.netbeans.modules.csl.api.OccurrencesFinder;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.parsing.spi.Parser.Result;
+import org.netbeans.modules.parsing.spi.Scheduler;
+import org.netbeans.modules.parsing.spi.SchedulerEvent;
 import org.netbeans.modules.python.editor.lexer.PythonCommentTokenId;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
@@ -69,7 +72,7 @@ import org.python.antlr.ast.Name;
  *
  * @author Tor Norbye
  */
-public class PythonOccurrencesMarker implements OccurrencesFinder {
+public class PythonOccurrencesMarker extends OccurrencesFinder {
     private boolean cancelled;
     private int caretPosition;
     private Map<OffsetRange, ColoringAttributes> occurrences;
@@ -99,14 +102,24 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
         this.caretPosition = position;
     }
 
-    public void run(CompilationInfo info) {
+    @Override
+    public int getPriority() {
+        return 0;
+    }
+    
+    @Override
+    public Class<? extends Scheduler> getSchedulerClass() {
+        return Scheduler.CURSOR_SENSITIVE_TASK_SCHEDULER;
+    }
+
+    public void run(Result info, SchedulerEvent event) {
         resume();
 
         if (isCancelled()) {
             return;
         }
 
-        PythonParserResult ppr = PythonAstUtils.getParseResult(info);
+        PythonParserResult ppr = PythonAstUtils.getParseResult((ParserResult) info);
         if (ppr == null) {
             return;
         }
@@ -115,7 +128,7 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
             return;
         }
 
-        int astOffset = PythonAstUtils.getAstOffset(info, caretPosition);
+        int astOffset = PythonAstUtils.getAstOffset((ParserResult) info, caretPosition);
         if (astOffset == -1) {
             return;
         }
@@ -132,7 +145,7 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
             closest = null;
         }
 
-        Document document = info.getDocument();
+        Document document = info.getSnapshot().getSource().getDocument(false);
         if (document == null) {
             return;
         }
@@ -155,7 +168,7 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
                     if (id == PythonCommentTokenId.VARNAME) {
                         String name = token.text().toString();
 
-                        offsets = findNames(ppr, path, name, info, offsets);
+                        offsets = findNames(ppr, path, name, offsets);
 
                         int start = embedded.offset();
                         offsets.add(new OffsetRange(start, start + name.length()));
@@ -184,13 +197,13 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
             //addNodes(scopeNode != null ? scopeNode : root, name, highlights);
             //closest = null;
             String name = ((Name)closest).getInternalId();
-            offsets = findNames(ppr, path, name, info, offsets);
+            offsets = findNames(ppr, path, name, offsets);
         } else if (closest instanceof Attribute) {
             Attribute attr = (Attribute)closest;
-            offsets = findSameAttributes(info, root, attr);
+            offsets = findSameAttributes(ppr, root, attr);
         } else if (closest instanceof Import || closest instanceof ImportFrom) {
             // Try to find occurrences of an imported symbol
-            offsets = findNameFromImport(caretPosition, ppr, path, info, offsets);
+            offsets = findNameFromImport(caretPosition, ppr, path, offsets);
         } else if ((closest instanceof FunctionDef || closest instanceof ClassDef) &&
                 PythonAstUtils.getNameRange(null, closest).containsInclusive(astOffset)) {
             String name;
@@ -200,13 +213,13 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
                 assert closest instanceof ClassDef;
                 name = ((ClassDef)closest).getInternalName();
             }
-            offsets = findNames(ppr, path, name, info, offsets);
+            offsets = findNames(ppr, path, name, offsets);
 
             if (offsets == null || offsets.size() == 0) {
                 if (closest instanceof FunctionDef) {
                     FunctionDef def = (FunctionDef)closest;
                     // Call: highlight calls and definitions
-                    CallVisitor visitor = new CallVisitor(info, def, null);
+                    CallVisitor visitor = new CallVisitor(ppr, def, null);
                     PythonTree scope = PythonAstUtils.getClassScope(path);
                     try {
                         visitor.visit(scope);
@@ -236,7 +249,7 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
                     }
                 }
                 if (nearest != null) {
-                    OffsetRange range = PythonAstUtils.getNameRange(info, nearest);
+                    OffsetRange range = PythonAstUtils.getNameRange((PythonParserResult) info, nearest);
                     if (!range.containsInclusive(astOffset)) {
                         nearest = null;
                     }
@@ -251,7 +264,7 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
             }
             if (call != null || def != null) {
                 // Call: highlight calls and definitions
-                CallVisitor visitor = new CallVisitor(info, def, call);
+                CallVisitor visitor = new CallVisitor(ppr, def, call);
                 PythonTree scope = PythonAstUtils.getClassScope(path);
                 try {
                     visitor.visit(scope);
@@ -300,9 +313,9 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
         private final FunctionDef def;
         private final String name;
         private final Set<OffsetRange> ranges = new HashSet<OffsetRange>();
-        private final CompilationInfo info;
+        private final PythonParserResult info;
 
-        CallVisitor(CompilationInfo info, FunctionDef def, Call call) {
+        CallVisitor(PythonParserResult info, FunctionDef def, Call call) {
             this.info = info;
             this.def = def;
             this.call = call;
@@ -343,8 +356,8 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
         }
     }
 
-    private Set<OffsetRange> findNameFromImport(int lexOffset, PythonParserResult ppr, AstPath path, CompilationInfo info, Set<OffsetRange> offsets) {
-        BaseDocument doc = (BaseDocument)info.getDocument();
+    private Set<OffsetRange> findNameFromImport(int lexOffset, PythonParserResult ppr, AstPath path, Set<OffsetRange> offsets) {
+        BaseDocument doc = (BaseDocument)ppr.getSnapshot().getSource().getDocument(false);
         try {
             doc.readLock();
             String identifier = Utilities.getIdentifier(doc, lexOffset);
@@ -358,7 +371,7 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
             // TODO - determine if you're hovering over a whole module name instead of an imported
             // symbol, and if so, work a bit harder...
             if (identifier.length() > 0) {
-                return findNames(ppr, path, identifier, info, offsets);
+                return findNames(ppr, path, identifier, offsets);
             }
         } catch (BadLocationException ex) {
             Exceptions.printStackTrace(ex);
@@ -369,12 +382,12 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
         return null;
     }
 
-    private Set<OffsetRange> findNames(PythonParserResult ppr, AstPath path, String name, CompilationInfo info, Set<OffsetRange> offsets) {
+    private Set<OffsetRange> findNames(PythonParserResult ppr, AstPath path, String name, Set<OffsetRange> offsets) {
         //offsets = PythonAstUtils.getLocalVarOffsets(info, scope, name);
-        return PythonAstUtils.getAllOffsets(info, path, caretPosition, name, false);
+        return PythonAstUtils.getAllOffsets(ppr, path, caretPosition, name, false);
     }
 
-    private Set<OffsetRange> findSameAttributes(CompilationInfo info, PythonTree root, Attribute attr) {
+    private Set<OffsetRange> findSameAttributes(PythonParserResult info, PythonTree root, Attribute attr) {
         List<PythonTree> result = new ArrayList<PythonTree>();
         PythonAstUtils.addNodesByType(root, new Class[]{Attribute.class}, result);
 
@@ -397,7 +410,7 @@ public class PythonOccurrencesMarker implements OccurrencesFinder {
                     OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(info, astRange);
                     if (name != null && (node instanceof Import || node instanceof ImportFrom)) {
                         // Try to find the exact spot
-                        lexRange = PythonLexerUtils.getImportNameOffset((BaseDocument)info.getDocument(), lexRange, node, name);
+                        lexRange = PythonLexerUtils.getImportNameOffset((BaseDocument)info.getSnapshot().getSource().getDocument(false), lexRange, node, name);
                     }
                     if (lexRange != OffsetRange.NONE) {
                         offsets.add(lexRange);

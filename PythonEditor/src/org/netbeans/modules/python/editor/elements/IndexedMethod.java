@@ -30,7 +30,7 @@
  */
 package org.netbeans.modules.python.editor.elements;
 
-import org.netbeans.modules.gsf.api.ElementKind;
+import org.netbeans.modules.csl.api.ElementKind;
 
 /**
  *

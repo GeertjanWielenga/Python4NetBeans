@@ -42,16 +42,15 @@
  * made subject to such option by the copyright holder.
  */
 package org.netbeans.modules.python.editor.refactoring;
-
+/*
 import java.io.IOException;
-import org.netbeans.napi.gsfret.source.Phase;
-import org.netbeans.napi.gsfret.source.WorkingCopy;
 import org.openide.ErrorManager;
-
+*
 /**
  *
  * @author Jan Becicka
  */
+/* Could use a JavaSource like source rewriter
 public abstract class SearchVisitor {
     protected WorkingCopy workingCopy;
 
@@ -66,3 +65,4 @@ public abstract class SearchVisitor {
 
     public abstract void scan();
 }
+*/

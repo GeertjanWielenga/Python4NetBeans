@@ -48,17 +48,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.api.Error;
-import org.netbeans.modules.gsf.api.Index;
-import org.netbeans.modules.gsf.api.NameKind;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.Severity;
-import org.netbeans.modules.gsf.spi.DefaultError;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.Severity;
+import org.netbeans.modules.csl.api.Error;
+import org.netbeans.modules.csl.spi.DefaultError;
+import org.netbeans.modules.parsing.spi.indexing.support.QuerySupport;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonIndex;
 import org.netbeans.modules.python.editor.PythonIndexer;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.PythonUtils;
 import org.netbeans.modules.python.editor.elements.AstElement;
 import org.netbeans.modules.python.editor.elements.Element;
@@ -325,41 +324,39 @@ public class SymbolTable {
         return modules;
     }
 
-    private void addSymbolsFromModule(CompilationInfo info, String module, String prefix, NameKind kind, Set<? super IndexedElement> result) {
+    private void addSymbolsFromModule(PythonParserResult info, String module, String prefix, QuerySupport.Kind kind, Set<? super IndexedElement> result) {
         if (PythonIndex.isBuiltinModule(module)) {
             Set<IndexedElement> all = getAllSymbolsFromModule(info, module);
             for (IndexedElement e : all) {
-                if (kind == NameKind.PREFIX) {
+                if (kind == QuerySupport.Kind.PREFIX) {
                     if (e.getName().startsWith(prefix)) {
                         result.add(e);
                     }
-                } else if (kind == NameKind.EXACT_NAME) {
+                } else if (kind == QuerySupport.Kind.EXACT) {
                     if (prefix.equals(e.getName())) {
                         result.add(e);
                     }
-                } else if (kind == NameKind.CASE_INSENSITIVE_PREFIX) {
+                } else if (kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX) {
                     if (e.getName().regionMatches(true, 0, prefix, 0, prefix.length())) {
                         result.add(e);
                     }
                 }
             }
         } else {
-            Index gsfIndex = info.getIndex(PythonTokenId.PYTHON_MIME_TYPE);
-            PythonIndex index = PythonIndex.get(gsfIndex, info.getFileObject());
-            Set<IndexedElement> elements = index.getImportedElements(prefix, kind, PythonIndex.ALL_SCOPE, Collections.singleton(module), null);
+            PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
+            Set<IndexedElement> elements = index.getImportedElements(prefix, kind, Collections.singleton(module), null);
             for (IndexedElement e : elements) {
                 result.add(e);
             }
         }
     }
 
-    private Set<IndexedElement> getAllSymbolsFromModule(CompilationInfo info, String module) {
+    private Set<IndexedElement> getAllSymbolsFromModule(PythonParserResult info, String module) {
         Set<IndexedElement> elements = importedElements.get(module);
         if (elements == null) {
-            Index gsfIndex = info.getIndex(PythonTokenId.PYTHON_MIME_TYPE);
-            PythonIndex index = PythonIndex.get(gsfIndex, info.getFileObject());
+            PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
             Set<String> systemHolder = new HashSet<String>(3);
-            elements = index.getImportedElements("", NameKind.PREFIX, PythonIndex.ALL_SCOPE, Collections.singleton(module), systemHolder);
+            elements = index.getImportedElements("", QuerySupport.Kind.PREFIX, Collections.singleton(module), systemHolder);
             // Cache system modules - don't cache local modules
             if (!systemHolder.isEmpty()) {
                 importedElements.put(module, elements);
@@ -369,16 +366,11 @@ public class SymbolTable {
         return elements;
     }
 
-    public Set<Element> getDefinedElements(CompilationInfo info, PythonTree scope, String prefix, NameKind kind) {
+    public Set<Element> getDefinedElements(PythonParserResult info, PythonTree scope, String prefix, QuerySupport.Kind kind) {
         Set<Element> elements = new HashSet<Element>(300);
         ScopeInfo scopeInfo = scopes.get(scope);
-        String module = PythonUtils.getModuleName(fileObject, null);
-        String url = null;
-        try {
-            url = fileObject.getURL().toExternalForm();
-        } catch (FileStateInvalidException ex) {
-            Exceptions.printStackTrace(ex);
-        }
+        String module = PythonUtils.getModuleName(fileObject);
+        String url = fileObject.toURL().toExternalForm();
 
         // Get builtin symbols
         for (String mod : getModulesToStarImport()) {
@@ -401,15 +393,15 @@ public class SymbolTable {
                     // Something in narrower scope already processed this one
                     continue;
                 }
-                if (kind == NameKind.EXACT_NAME) {
+                if (kind == QuerySupport.Kind.EXACT) {
                     if (!(name.equals(prefix))) {
                         continue;
                     }
-                } else if (kind == NameKind.PREFIX) {
+                } else if (kind == QuerySupport.Kind.PREFIX) {
                     if (!name.startsWith(prefix)) {
                         continue;
                     }
-                } else if (kind == NameKind.CASE_INSENSITIVE_PREFIX) {
+                } else if (kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX) {
                     if (!name.regionMatches(true, 0, prefix, 0, prefix.length())) {
                         continue;
                     }
@@ -782,7 +774,7 @@ public class SymbolTable {
         }
     }
 
-    public Map<String, SymInfo> getUnresolvedNames(CompilationInfo info) {
+    public Map<String, SymInfo> getUnresolvedNames(PythonParserResult info) {
         Map<String, SymInfo> unresolved = new HashMap<String, SymInfo>();
         Set<String> builtin = getBuiltin(info);
 
@@ -821,7 +813,7 @@ public class SymbolTable {
         return unresolved;
     }
 
-    public List<Attribute> getNotInInitAttributes(CompilationInfo info) {
+    public List<Attribute> getNotInInitAttributes(PythonParserResult info) {
         List<Attribute> notInInitAttribs = new ArrayList<Attribute>();
         for (ScopeInfo scopeInfo : scopes.values()) {
             if (scopeInfo.scope_node instanceof ClassDef) {
@@ -932,11 +924,10 @@ public class SymbolTable {
         return false;
     }
 
-    public List<PythonTree> getUnresolvedParents(CompilationInfo info) {
+    public List<PythonTree> getUnresolvedParents(PythonParserResult info) {
         // deal with unresolved parents in inherit trees
         List<PythonTree> unresolvedParents = new ArrayList<PythonTree>();
-        Index gsfIndex = info.getIndex(PythonTokenId.PYTHON_MIME_TYPE);
-        PythonIndex index = PythonIndex.get(gsfIndex, info.getFileObject());
+        PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
 
         for (String cur : classes.keySet()) {
             ClassDef cls = classes.get(cur);
@@ -965,7 +956,7 @@ public class SymbolTable {
                             if (!isImported(moduleName)) {
                                 unresolvedParents.add(base);
                             } else {
-                                Set<IndexedElement> found = index.getImportedElements(clsName, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, Collections.<String>singleton(moduleName), null);
+                                Set<IndexedElement> found = index.getImportedElements(clsName, QuerySupport.Kind.EXACT, Collections.<String>singleton(moduleName), null);
                                 if (found.size() == 0) {
                                     unresolvedParents.add(base);
                                 }
@@ -980,7 +971,7 @@ public class SymbolTable {
         return unresolvedParents;
     }
 
-    public HashMap<ClassDef, String> getClassesCyclingRedundancies(CompilationInfo info) {
+    public HashMap<ClassDef, String> getClassesCyclingRedundancies(PythonParserResult info) {
         HashMap<ClassDef, String> cyclingRedundancies = new HashMap<ClassDef, String>();
         for (String cur : classes.keySet()) {
             HashMap<String, String> returned = new HashMap<String, String>();
@@ -996,8 +987,7 @@ public class SymbolTable {
         return cyclingRedundancies;
     }
 
-    @SuppressWarnings("unchecked")
-    public List<PythonTree> getUnresolvedAttributes(CompilationInfo info) {
+    public List<PythonTree> getUnresolvedAttributes(PythonParserResult info) {
         List<PythonTree> unresolvedNodes = new ArrayList<PythonTree>();
         for (ScopeInfo scopeInfo : scopes.values()) {
             Set<String> unresolved = new HashSet<String>();
@@ -1054,8 +1044,7 @@ public class SymbolTable {
         return unresolvedNodes;
     }
 
-    @SuppressWarnings("unchecked")
-    public List<PythonTree> getUnresolved(CompilationInfo info) {
+    public List<PythonTree> getUnresolved(PythonParserResult info) {
         List<PythonTree> unresolvedNodes = new ArrayList<PythonTree>();
         Set<String> builtin = getBuiltin(info);
 
@@ -1094,8 +1083,7 @@ public class SymbolTable {
 
             if (unresolved.size() > 0) {
                 // Check imports and see if it's resolved by existing imports
-                Index gsfIndex = info.getIndex(PythonTokenId.PYTHON_MIME_TYPE);
-                PythonIndex index = PythonIndex.get(gsfIndex, info.getFileObject());
+                PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
                 // TODO - cache system libraries!
                 // TODO - make method which doesn't create elements for these guys!
 //                Set<IndexedElement> elements = index.getImportedElements("", NameKind.PREFIX, PythonIndex.ALL_SCOPE, imports, importsFrom);
@@ -1121,7 +1109,6 @@ public class SymbolTable {
         return unresolvedNodes;
     }
 
-    @SuppressWarnings("unchecked")
     public List<PythonTree> getUnused(boolean skipSelf, boolean skipParams) { // not used for unused imports, see separate method
         List<PythonTree> unusedNodes = new ArrayList<PythonTree>();
 
@@ -1207,10 +1194,9 @@ public class SymbolTable {
     }
     private static Set<String> builtinSymbols;
 
-    private Set<String> getBuiltin(CompilationInfo info) {
+    private Set<String> getBuiltin(PythonParserResult info) {
         if (builtinSymbols == null) {
-            Index gsfIndex = info.getIndex(PythonTokenId.PYTHON_MIME_TYPE);
-            PythonIndex index = PythonIndex.get(gsfIndex, info.getFileObject());
+            PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
             builtinSymbols = index.getBuiltinSymbols();
         }
 

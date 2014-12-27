@@ -53,7 +53,6 @@ import java.util.Collections;
 import java.util.List;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
-import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.KeyStroke;
@@ -63,9 +62,10 @@ import javax.swing.text.Position;
 import org.netbeans.api.lexer.TokenHierarchy;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.ElementKind;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.python.editor.PythonIndex;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.lexer.Call;
 import org.openide.util.Exceptions;
 import org.openide.util.ImageUtilities;
@@ -84,13 +84,13 @@ import org.openide.util.NbBundle;
 public class ImportModulePanel extends javax.swing.JPanel {
 
     private final String ident;
-    private CompilationInfo info;
+    private PythonParserResult info;
     private DefaultListModel model;
     private final int position;
 
     /** Creates new form ImportClassPanel */
     @SuppressWarnings("deprecation")
-    public ImportModulePanel(String ident, List</*TypeElement*/String> priviledged, List</*TypeElement*/String> denied, Font font, CompilationInfo info, int position) {
+    public ImportModulePanel(String ident, List</*TypeElement*/String> priviledged, List</*TypeElement*/String> denied, Font font, PythonParserResult info, int position) {
         this.ident = ident;
         // System.err.println("priviledged=" + priviledged);
         // System.err.println("denied=" + denied);
@@ -304,7 +304,7 @@ public class ImportModulePanel extends javax.swing.JPanel {
         }
         PopupUtil.hidePopup();
 
-        Document document = info.getDocument();
+        Document document = info.getSnapshot().getSource().getDocument(false);
         try {
             Position pos = document.createPosition(position);
 

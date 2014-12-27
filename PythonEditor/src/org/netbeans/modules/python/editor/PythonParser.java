@@ -34,10 +34,20 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.event.ChangeListener;
 import javax.swing.text.BadLocationException;
+import org.netbeans.modules.csl.api.Severity;
+import org.netbeans.modules.csl.spi.DefaultError;
+import org.netbeans.modules.csl.api.Error;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.parsing.api.Snapshot;
+import org.netbeans.modules.parsing.api.Task;
+import org.netbeans.modules.parsing.spi.Parser;
+import org.netbeans.modules.parsing.spi.SourceModificationEvent;
+import org.openide.filesystems.FileObject;
 import org.python.antlr.runtime.ANTLRStringStream;
 import org.python.antlr.runtime.BaseRecognizer;
 import org.python.antlr.runtime.BitSet;
@@ -47,19 +57,7 @@ import org.python.antlr.runtime.IntStream;
 import org.python.antlr.runtime.Lexer;
 import org.python.antlr.runtime.MismatchedTokenException;
 import org.python.antlr.runtime.RecognitionException;
-import org.netbeans.modules.gsf.api.Error;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.Parser;
-import org.netbeans.modules.gsf.api.PositionManager;
 
-import org.netbeans.modules.gsf.api.ParseEvent;
-import org.netbeans.modules.gsf.api.ParseListener;
-import org.netbeans.modules.gsf.api.ParserFile;
-import org.netbeans.modules.gsf.api.Severity;
-import org.netbeans.modules.gsf.api.SourceFileReader;
-import org.netbeans.modules.gsf.api.TranslatedSource;
-import org.netbeans.modules.gsf.spi.DefaultError;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
 import org.openide.filesystems.FileUtil;
 import org.openide.util.Exceptions;
 import org.python.antlr.BaseParser;
@@ -82,13 +80,15 @@ import org.python.antlr.runtime.CharStream;
  * @author Frank Wierzbicki
  * @author Tor Norbye
  */
-public class PythonParser implements Parser {
+public class PythonParser extends Parser {
     /** For unit tests such that they can make sure we didn't have a parser abort */
     static Throwable runtimeException;
 
     static {
         org.python.core.PySystemState.initialize();
     }
+    
+    private Result lastResult;
 
     public mod file_input(CharStream charStream, String fileName) throws RecognitionException {
         ListErrorHandler eh = new ListErrorHandler();
@@ -107,12 +107,41 @@ public class PythonParser implements Parser {
         return tree;
     }
 
+    @Override
+    public void addChangeListener(ChangeListener changeListener) {}
+
+    @Override
+    public void removeChangeListener(ChangeListener changeListener) {}
+    
     public PythonTree parse(InputStream istream, String fileName) throws Exception {
         InputStreamReader reader = new InputStreamReader(istream, "ISO-8859-1");
         return file_input(new ANTLRReaderStream(reader), fileName);
     }
+    
+    @Override
+    public final Result getResult(Task task) throws org.netbeans.modules.parsing.spi.ParseException {
+        return lastResult;
+    }
+    
+    private static final Logger LOG = Logger.getLogger(PythonParser.class.getName());
 
-    public PythonParserResult parse(final Context context, Sanitize sanitizing) throws Exception {
+    @Override
+    public void parse(Snapshot snapshot, Task task, SourceModificationEvent event) throws org.netbeans.modules.parsing.spi.ParseException {
+        Context context = new Context();
+        context.snapshot = snapshot;
+        context.event = event;
+        context.task = task;
+        context.caretOffset = GsfUtilities.getLastKnownCaretOffset(snapshot, event);
+        context.source = snapshot.getText().toString();
+        context.file = snapshot.getSource().getFileObject();
+        /* Let's not sanitize ;-) Would be great if we could have a more robust parser
+        if (context.caretOffset != -1) {
+            context.sanitized = Sanitize.EDITED_DOT;
+        }
+        */
+        lastResult = parse(context, context.sanitized);
+    }
+    public PythonParserResult parse(final Context context, Sanitize sanitizing) {
         boolean sanitizedSource = false;
         String sourceCode = context.source;
         if (!((sanitizing == Sanitize.NONE) || (sanitizing == Sanitize.NEVER))) {
@@ -134,7 +163,7 @@ public class PythonParser implements Parser {
         }
 
         final List<Error> errors = new ArrayList<Error>();
-        final ParserFile file = context.file;
+        final FileObject file = context.file;
         try {
             String fileName = file.getNameExt();
             // TODO - sniff file headers etc. Frank's comment:
@@ -151,7 +180,7 @@ public class PythonParser implements Parser {
             ListErrorHandler errorHandler = new ListErrorHandler() {
                 @Override
                 public void error(String message, PythonTree t) {
-                    errors.add(new DefaultError(null, message, null, file.getFileObject(), t.getCharStartIndex(), t.getCharStopIndex(), Severity.ERROR));
+                    errors.add(new DefaultError(null, message, null, file, t.getCharStartIndex(), t.getCharStopIndex(), Severity.ERROR));
                     super.error(message, t);
                 }
 
@@ -191,7 +220,7 @@ public class PythonParser implements Parser {
                         }
                         int start = lineOffset;//t.getCharStartIndex();
                         int stop = lineOffset;//t.getCharStopIndex();
-                        errors.add(new DefaultError(null, message, null, file.getFileObject(), start, stop, Severity.ERROR));
+                        errors.add(new DefaultError(null, message, null, file, start, stop, Severity.ERROR));
                     }
                     return super.recoverFromMismatchedToken(br, input, ttype, follow);
                 }
@@ -255,7 +284,7 @@ public class PythonParser implements Parser {
                             end = start;
                         }
 
-                        errors.add(new DefaultError(null, message, null, file.getFileObject(), start, end, Severity.ERROR));
+                        errors.add(new DefaultError(null, message, null, file, start, end, Severity.ERROR));
 
                         super.reportError(br, re);
                     }
@@ -267,16 +296,14 @@ public class PythonParser implements Parser {
             CommonTokenStream tokens = new CommonTokenStream(lexer);
             tokens.discardOffChannelTokens(true);
             PythonTokenSource indentedSource = new PythonTokenSource(tokens, fileName);
-            tokens = new CommonTokenStream(indentedSource);
-            org.python.antlr.PythonParser parser = new org.python.antlr.PythonParser(tokens);
+            CommonTokenStream indentedTokens = new CommonTokenStream(indentedSource);
+            org.python.antlr.PythonParser parser = new org.python.antlr.PythonParser(indentedTokens);
             parser.setTreeAdaptor(new PythonTreeAdaptor());
             parser.setErrorHandler(errorHandler);
             org.python.antlr.PythonParser.file_input_return r = parser.file_input();
             PythonTree t = (PythonTree)r.getTree();
-            PythonParserResult result = createParseResult(t, file, true);
-            for (Error error : errors) {
-                result.addError(error);
-            }
+            PythonParserResult result = new PythonParserResult(t, context.snapshot);
+            result.setErrors(errors);
 
             result.setSanitized(context.sanitized, context.sanitizedRange, context.sanitizedContents);
             result.setSource(sourceCode);
@@ -294,8 +321,8 @@ public class PythonParser implements Parser {
                     if (desc == null) {
                         desc = pe.getMessage();
                     }
-                    DefaultError error = new DefaultError(null /*key*/, desc, null, file.getFileObject(), offset, offset, Severity.ERROR);
-                    PythonParserResult parserResult = createParseResult(null, file, false);
+                    DefaultError error = new DefaultError(null /*key*/, desc, null, file, offset, offset, Severity.ERROR);
+                    PythonParserResult parserResult = new PythonParserResult(null, context.snapshot);
                     parserResult.addError(error);
                     for (Error e : errors) {
                         parserResult.addError(e);
@@ -308,11 +335,12 @@ public class PythonParser implements Parser {
             }
         } catch (NullPointerException e) {
             String fileName = "";
-            if (file.getFileObject() != null) {
-                fileName = FileUtil.getFileDisplayName(file.getFileObject());
+            if (file != null) {
+                fileName = FileUtil.getFileDisplayName(file);
             }
-            Exceptions.attachMessage(e, "Was parsing " + fileName);
-            return createParseResult(null, file, false);
+            e = Exceptions.attachMessage(e, "Was parsing " + fileName);
+            Exceptions.printStackTrace(e);
+            return new PythonParserResult(null, context.snapshot);
         } catch (Throwable t) {
             runtimeException = t;
             StackTraceElement[] stackTrace = t.getStackTrace();
@@ -321,10 +349,10 @@ public class PythonParser implements Parser {
                 // Don't bug user about it -- we already know
                 Logger.getLogger(this.getClass().getName()).log(Level.FINE, "Encountered issue #150921", t);
             } else {
-                Exceptions.attachMessage(t, "Was parsing " + FileUtil.getFileDisplayName(file.getFileObject()));
+                t = Exceptions.attachMessage(t, "Was parsing " + FileUtil.getFileDisplayName(file));
                 Exceptions.printStackTrace(t);
             }
-            return createParseResult(null, file, false);
+            return new PythonParserResult(null, context.snapshot);
         }
     }
 
@@ -336,63 +364,13 @@ public class PythonParser implements Parser {
         }
     }
 
-    public void parseFiles(Job job) {
-        ParseListener listener = job.listener;
-        SourceFileReader reader = job.reader;
-
-        for (ParserFile file : job.files) {
-            ParseEvent beginEvent = new ParseEvent(ParseEvent.Kind.PARSE, file, null);
-            listener.started(beginEvent);
-
-            PythonParserResult result = null;
-
-            try {
-                // RST files aren't really Python but I want to index them so
-                // fake up a parser result I can use
-                String nameExt = file.getNameExt();
-                if (nameExt != null && nameExt.endsWith(".rst")) { // NOI18N
-                    result = createParseResult(null, file, false);
-                } else if (nameExt != null && nameExt.endsWith(".egg")) { // NOI18N
-                    // .Egg files aren't really python but we need the indexer to get
-                    // a chance - GSF will only call it if it maps to a Python parser result
-                    result = createParseResult(null, file, false);
-                } else {
-                    CharSequence buffer = reader.read(file);
-                    String source = asString(buffer);
-
-                    int caretOffset = reader.getCaretOffset(file);
-                    if (caretOffset != -1 && job.translatedSource != null) {
-                        caretOffset = job.translatedSource.getAstOffset(caretOffset);
-                    }
-                    Context context = new Context(file, listener, source, caretOffset, job.translatedSource, job);
-
-                    result = parse(context, Sanitize.NONE);
-                    result.setSource(source);
-                }
-            } catch (Exception ioe) {
-                listener.exception(ioe);
-            }
-
-            ParseEvent doneEvent = new ParseEvent(ParseEvent.Kind.PARSE, file, result);
-            listener.finished(doneEvent);
-        }
-    }
-
-    public PositionManager getPositionManager() {
-        return new PythonPositionManager();
-    }
-
-    private PythonParserResult createParseResult(PythonTree rootNode, ParserFile file, boolean isValid) {
-        return new PythonParserResult(rootNode, this, file, isValid);
-    }
 
     @SuppressWarnings("fallthrough")
-    private PythonParserResult sanitize(final Context context,
-            final Sanitize sanitizing) throws Exception {
+    private PythonParserResult sanitize(final Context context, final Sanitize sanitizing) {
 
         switch (sanitizing) {
         case NEVER:
-            return createParseResult(null, context.file, false);
+            return new PythonParserResult(null, context.snapshot);
 
         case NONE:
             if (context.caretOffset != -1) {
@@ -433,7 +411,7 @@ public class PythonParser implements Parser {
         case EDITED_LINE:
         default:
             // We're out of tricks - just return the failed parse result
-            return createParseResult(null, context.file, false);
+            return new PythonParserResult(null, context.snapshot);
         }
     }
 
@@ -641,10 +619,10 @@ public class PythonParser implements Parser {
         EDITED_LINE,
     }
 
-    /** Parsing context */
+    /** Sanitize context */
     public static class Context {
-        private final ParserFile file;
-        private ParseListener listener;
+        private FileObject file;
+//        private ParseListener listener;
         private int errorOffset;
         private String source;
         private String sanitizedSource;
@@ -652,42 +630,45 @@ public class PythonParser implements Parser {
         private String sanitizedContents;
         private int caretOffset;
         private Sanitize sanitized = Sanitize.NONE;
-        private TranslatedSource translatedSource;
-        private Parser.Job job;
-
-        public Context(ParserFile parserFile, ParseListener listener, String source, int caretOffset, TranslatedSource translatedSource, Parser.Job job) {
-            this.file = parserFile;
-            this.listener = listener;
-            this.source = source;
-            this.caretOffset = caretOffset;
-            this.translatedSource = translatedSource;
-            this.job = job;
-
-
-            if (caretOffset != -1) {
-                sanitized = Sanitize.EDITED_DOT;
-            }
-        }
-
-        @Override
-        public String toString() {
-            return "PythonParser.Context(" + file.toString() + ")"; // NOI18N
-        }
-
-        public OffsetRange getSanitizedRange() {
-            return sanitizedRange;
-        }
-
-        public Sanitize getSanitized() {
-            return sanitized;
-        }
-
-        public String getSanitizedSource() {
-            return sanitizedSource;
-        }
-
-        public int getErrorOffset() {
-            return errorOffset;
-        }
+//        private TranslatedSource translatedSource;
+//        private Parser.Job job;
+        private Snapshot snapshot;
+        private Task task;
+        private SourceModificationEvent event;
+//
+//        public Context(ParserFile parserFile, ParseListener listener, String source, int caretOffset, TranslatedSource translatedSource, Parser.Job job) {
+//            this.file = parserFile;
+//            this.listener = listener;
+//            this.source = source;
+//            this.caretOffset = caretOffset;
+//            this.translatedSource = translatedSource;
+//            this.job = job;
+//
+//
+//            if (caretOffset != -1) {
+//                sanitized = Sanitize.EDITED_DOT;
+//            }
+//        }
+//
+//        @Override
+//        public String toString() {
+//            return "PythonParser.Context(" + file.toString() + ")"; // NOI18N
+//        }
+//
+//        public OffsetRange getSanitizedRange() {
+//            return sanitizedRange;
+//        }
+//
+//        public Sanitize getSanitized() {
+//            return sanitized;
+//        }
+//
+//        public String getSanitizedSource() {
+//            return sanitizedSource;
+//        }
+//
+//        public int getErrorOffset() {
+//            return errorOffset;
+//        }
     }
 }

@@ -44,12 +44,12 @@ import org.netbeans.api.lexer.TokenId;
 import org.netbeans.api.lexer.TokenSequence;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.EditorOptions;
+import org.netbeans.modules.csl.api.KeystrokeHandler;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.ParserResult;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.EditorOptions;
-import org.netbeans.modules.gsf.api.KeystrokeHandler;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
 import org.openide.util.Exceptions;
 import org.python.antlr.PythonTree;
 
@@ -1259,7 +1259,7 @@ public class PythonKeystrokeHandler implements KeystrokeHandler {
         }
     }
 
-    public List<OffsetRange> findLogicalRanges(CompilationInfo info, int caretOffset) {
+    public List<OffsetRange> findLogicalRanges(ParserResult info, int caretOffset) {
         PythonTree root = PythonAstUtils.getRoot(info);
         if (root != null) {
             List<OffsetRange> ranges = new ArrayList<OffsetRange>();
@@ -1267,7 +1267,7 @@ public class PythonKeystrokeHandler implements KeystrokeHandler {
             OffsetRange prevRange = OffsetRange.NONE;
             for (PythonTree node : path) {
                 OffsetRange astRange = PythonAstUtils.getRange(node);
-                OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(info, astRange);
+                OffsetRange lexRange = PythonLexerUtils.getLexerOffsets((PythonParserResult) info, astRange);
                 if (lexRange != OffsetRange.NONE) {
                     if (prevRange == OffsetRange.NONE ||
                             prevRange.getStart() > lexRange.getStart() ||
@@ -1278,7 +1278,7 @@ public class PythonKeystrokeHandler implements KeystrokeHandler {
                 }
             }
 
-            int docLength = info.getDocument().getLength();
+            int docLength = info.getSnapshot().getSource().getDocument(false).getLength();
             if (prevRange == OffsetRange.NONE || prevRange.getStart() > 0 ||
                     prevRange.getEnd() < docLength) {
                 ranges.add(new OffsetRange(0, docLength));

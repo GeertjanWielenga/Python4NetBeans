@@ -63,12 +63,12 @@ public class PythonRefactoringsFactory implements RefactoringPluginFactory {
         PythonElementCtx handle = look.lookup(PythonElementCtx.class);
         if (refactoring instanceof WhereUsedQuery) {
             if (handle != null) {
-                return new PythonWhereUsedQueryPlugin((WhereUsedQuery)refactoring);
+//                return new PythonWhereUsedQueryPlugin((WhereUsedQuery)refactoring);
             }
         } else if (refactoring instanceof RenameRefactoring) {
             if (handle != null || ((file != null) && PythonUtils.canContainPython(file))) {
                 //rename java file, class, method etc..
-                return new PythonRenameRefactoringPlugin((RenameRefactoring)refactoring);
+//                return new PythonRenameRefactoringPlugin((RenameRefactoring)refactoring);
             }
         }
         return null;
