@@ -99,7 +99,6 @@ public class PanelOptionsVisual extends SettingsPanel implements ActionListener,
                 mainFileTextField.setEnabled( lastMainClassCheck );
                 break;
             case EXISTING:
-                setAsMainCheckBox.setVisible( true );
                 createMainCheckBox.setVisible( false );
                 mainFileTextField.setVisible( false );
                 break;
@@ -154,7 +153,6 @@ public class PanelOptionsVisual extends SettingsPanel implements ActionListener,
 
         createMainCheckBox = new javax.swing.JCheckBox();
         mainFileTextField = new javax.swing.JTextField();
-        setAsMainCheckBox = new javax.swing.JCheckBox();
         jLabel1 = new javax.swing.JLabel();
         platforms = org.netbeans.modules.python.api.PlatformComponentFactory.getPythonPlatformsComboxBox();
         manage = new javax.swing.JButton();
@@ -163,9 +161,6 @@ public class PanelOptionsVisual extends SettingsPanel implements ActionListener,
         org.openide.awt.Mnemonics.setLocalizedText(createMainCheckBox, org.openide.util.NbBundle.getBundle(PanelOptionsVisual.class).getString("LBL_createMainCheckBox")); // NOI18N
 
         mainFileTextField.setText("main");
-
-        setAsMainCheckBox.setSelected(true);
-        org.openide.awt.Mnemonics.setLocalizedText(setAsMainCheckBox, org.openide.util.NbBundle.getBundle(PanelOptionsVisual.class).getString("LBL_setAsMainCheckBox")); // NOI18N
 
         jLabel1.setLabelFor(platforms);
         org.openide.awt.Mnemonics.setLocalizedText(jLabel1, org.openide.util.NbBundle.getMessage(PanelOptionsVisual.class, "TXT_PythonPlatform")); // NOI18N
@@ -182,9 +177,6 @@ public class PanelOptionsVisual extends SettingsPanel implements ActionListener,
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addComponent(setAsMainCheckBox)
-                .addContainerGap(353, Short.MAX_VALUE))
-            .addGroup(layout.createSequentialGroup()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(createMainCheckBox)
                     .addComponent(jLabel1))
@@ -195,13 +187,12 @@ public class PanelOptionsVisual extends SettingsPanel implements ActionListener,
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                         .addComponent(manage)
                         .addGap(4, 4, 4))
-                    .addComponent(mainFileTextField, javax.swing.GroupLayout.DEFAULT_SIZE, 353, Short.MAX_VALUE)))
+                    .addComponent(mainFileTextField)))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addComponent(setAsMainCheckBox)
-                .addGap(5, 5, 5)
+                .addContainerGap()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(createMainCheckBox)
                     .addComponent(mainFileTextField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
@@ -211,15 +202,13 @@ public class PanelOptionsVisual extends SettingsPanel implements ActionListener,
                         .addComponent(jLabel1)
                         .addComponent(platforms, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                     .addComponent(manage))
-                .addContainerGap(50, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         createMainCheckBox.getAccessibleContext().setAccessibleName(org.openide.util.NbBundle.getBundle(PanelOptionsVisual.class).getString("ACSN_createMainCheckBox")); // NOI18N
         createMainCheckBox.getAccessibleContext().setAccessibleDescription(org.openide.util.NbBundle.getBundle(PanelOptionsVisual.class).getString("ACSD_createMainCheckBox")); // NOI18N
         mainFileTextField.getAccessibleContext().setAccessibleName(org.openide.util.NbBundle.getBundle(PanelOptionsVisual.class).getString("ASCN_mainClassTextFiled")); // NOI18N
         mainFileTextField.getAccessibleContext().setAccessibleDescription(org.openide.util.NbBundle.getBundle(PanelOptionsVisual.class).getString("ASCD_mainClassTextFiled")); // NOI18N
-        setAsMainCheckBox.getAccessibleContext().setAccessibleName(org.openide.util.NbBundle.getBundle(PanelOptionsVisual.class).getString("ACSN_setAsMainCheckBox")); // NOI18N
-        setAsMainCheckBox.getAccessibleContext().setAccessibleDescription(org.openide.util.NbBundle.getBundle(PanelOptionsVisual.class).getString("ACSD_setAsMainCheckBox")); // NOI18N
 
         getAccessibleContext().setAccessibleName(org.openide.util.NbBundle.getMessage(PanelOptionsVisual.class, "ACSN_PanelOptionsVisual")); // NOI18N
         getAccessibleContext().setAccessibleDescription(org.openide.util.NbBundle.getMessage(PanelOptionsVisual.class, "ACSD_PanelOptionsVisual")); // NOI18N
@@ -286,7 +275,6 @@ private void manageActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:
     }
 
     void store( WizardDescriptor d ) {
-        d.putProperty(NewPythonProjectWizardIterator.SET_AS_MAIN, setAsMainCheckBox.isSelected() && setAsMainCheckBox.isVisible() ? Boolean.TRUE : Boolean.FALSE ); // NOI18N
         d.putProperty(NewPythonProjectWizardIterator.MAIN_FILE, createMainCheckBox.isSelected() && createMainCheckBox.isVisible() ? mainFileTextField.getText() : null ); // NOI18N
         PythonPlatform platform = PlatformComponentFactory.getPlatform(platforms);
         if (platform != null) {
@@ -300,7 +288,6 @@ private void manageActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:
     private javax.swing.JTextField mainFileTextField;
     private javax.swing.JButton manage;
     private javax.swing.JComboBox platforms;
-    private javax.swing.JCheckBox setAsMainCheckBox;
     // End of variables declaration//GEN-END:variables
     
     private void mainFileChanged () {
