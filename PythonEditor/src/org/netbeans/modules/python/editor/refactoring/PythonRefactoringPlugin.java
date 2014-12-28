@@ -43,6 +43,7 @@
  */
 package org.netbeans.modules.python.editor.refactoring;
 
+/*
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
@@ -64,13 +65,14 @@ import org.netbeans.napi.gsfret.source.WorkingCopy;
 import org.netbeans.modules.refactoring.spi.*;
 import org.netbeans.modules.refactoring.api.*;
 import org.openide.filesystems.FileObject;
-
+*/
 /**
  * Plugin implementation based on the one for Java refactoring.
  * 
  * @author Jan Becicka
  * @author Tor Norbye
  */
+/* Uncomment when it works ;-)
 public abstract class PythonRefactoringPlugin extends ProgressProviderAdapter implements RefactoringPlugin, CancellableTask<CompilationController> {
     protected enum Phase {
         PRECHECK, FASTCHECKPARAMETERS, CHECKPARAMETERS, PREPARE, DEFAULT
@@ -262,3 +264,4 @@ public abstract class PythonRefactoringPlugin extends ProgressProviderAdapter im
         }
     }
 }
+*/

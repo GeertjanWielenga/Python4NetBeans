@@ -54,12 +54,12 @@ import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.RuleContext;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.RuleContext;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
 import org.python.antlr.PythonTree;
@@ -228,7 +228,7 @@ public class Deprecations extends PythonAstRule {
     }
 
     private void addDeprecation(String module, String rationale, PythonRuleContext context, List<Hint> result) {
-        CompilationInfo info = context.compilationInfo;
+        PythonParserResult info = (PythonParserResult) context.parserResult;
         OffsetRange astOffsets = PythonAstUtils.getNameRange(info, context.node);
         OffsetRange lexOffsets = PythonLexerUtils.getLexerOffsets(info, astOffsets);
         BaseDocument doc = context.doc;
@@ -243,7 +243,7 @@ public class Deprecations extends PythonAstRule {
                 } else {
                     displayName = NbBundle.getMessage(Deprecations.class, "DeprecationsMsg", module);
                 }
-                Hint desc = new Hint(this, displayName, info.getFileObject(), lexOffsets, fixList, 1500);
+                Hint desc = new Hint(this, displayName, info.getSnapshot().getSource().getFileObject(), lexOffsets, fixList, 1500);
                 result.add(desc);
             }
         } catch (BadLocationException ex) {

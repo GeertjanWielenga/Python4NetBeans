@@ -47,13 +47,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.prefs.Preferences;
 import javax.swing.JComponent;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.NameKind;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.RuleContext;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.RuleContext;
+import org.netbeans.modules.parsing.spi.indexing.support.QuerySupport;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonIndex;
 import org.netbeans.modules.python.editor.PythonParserResult;
@@ -86,13 +85,12 @@ public class UnresolvedDetector extends PythonAstRule {
     }
 
     public void run(PythonRuleContext context, List<Hint> result) {
-        CompilationInfo info = context.compilationInfo;
-        PythonParserResult pr = PythonAstUtils.getParseResult(info);
-        SymbolTable symbolTable = pr.getSymbolTable();
+        PythonParserResult info = (PythonParserResult) context.parserResult;
+        SymbolTable symbolTable = info.getSymbolTable();
 
         List<PythonTree> unresolvedNames = symbolTable.getUnresolved(info);
         if (unresolvedNames.size() > 0) {
-            PythonIndex index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE), info.getFileObject());
+            PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
 
             for (PythonTree node : unresolvedNames) {
                 // Compute suggestions
@@ -121,7 +119,7 @@ public class UnresolvedDetector extends PythonAstRule {
                 } else if (name.equals("this")) {
                     message = NbBundle.getMessage(NameRule.class, "UnresolvedVariableMaybe", name, "self"); // NOI18N
                 } else if (tryModule) {
-                    Set<IndexedElement> moduleElements = index.getModules(name, NameKind.EXACT_NAME);
+                    Set<IndexedElement> moduleElements = index.getModules(name, QuerySupport.Kind.EXACT);
                     if (moduleElements.size() > 0) {
                         fixList.add(new ImportFix(context, node, name));
                     }
@@ -137,7 +135,7 @@ public class UnresolvedDetector extends PythonAstRule {
                 OffsetRange range = PythonAstUtils.getNameRange(info, node);
                 range = PythonLexerUtils.getLexerOffsets(info, range);
                 if (range != OffsetRange.NONE) {
-                    Hint desc = new Hint(this, message, info.getFileObject(), range, fixList, 2305);
+                    Hint desc = new Hint(this, message, info.getSnapshot().getSource().getFileObject(), range, fixList, 2305);
                     result.add(desc);
                 }
             }
@@ -202,7 +200,7 @@ public class UnresolvedDetector extends PythonAstRule {
                 symbol = mod.substring(colon + 1, end).trim();
                 mod = mod.substring(0, colon).trim();
             }
-            new ImportManager(context.compilationInfo).ensureImported(mod, symbol, false, false, true);
+            new ImportManager((PythonParserResult) context.parserResult).ensureImported(mod, symbol, false, false, true);
         }
 
         public boolean isSafe() {

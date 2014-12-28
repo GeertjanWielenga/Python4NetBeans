@@ -50,13 +50,12 @@ import java.util.Set;
 import java.util.prefs.Preferences;
 import javax.swing.JComponent;
 import org.netbeans.editor.BaseDocument;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.EditList;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.RuleContext;
+import org.netbeans.modules.csl.api.EditList;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.RuleContext;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.imports.ImportEntry;
@@ -81,7 +80,7 @@ public class UnusedImports extends PythonAstRule {
     }
 
     public boolean appliesTo(RuleContext context) {
-        FileObject fo = context.compilationInfo.getFileObject();
+        FileObject fo = context.parserResult.getSnapshot().getSource().getFileObject();
         return fo == null || !fo.getName().equals("__init__"); // NOI18N
     }
 
@@ -96,11 +95,10 @@ public class UnusedImports extends PythonAstRule {
     private static void computeUnusedImports(UnusedImports detector, PythonRuleContext context, List<Hint> result, Map<PythonTree, List<String>> unused) {
         assert result == null || unused == null; // compute either results or set of unused
 
-        CompilationInfo info = context.compilationInfo;
-        PythonParserResult parseResult = PythonAstUtils.getParseResult(info);
-        SymbolTable symbolTable = parseResult.getSymbolTable();
+        PythonParserResult info = (PythonParserResult) context.parserResult;
+        SymbolTable symbolTable = info.getSymbolTable();
         List<ImportEntry> unusedImports = symbolTable.getUnusedImports();
-        if (unusedImports.size() == 0) {
+        if (unusedImports.isEmpty()) {
             return;
         }
         Map<PythonTree, List<String>> maps = new HashMap<PythonTree, List<String>>();
@@ -150,7 +148,7 @@ public class UnusedImports extends PythonAstRule {
     }
 
     private static void addError(UnusedImports detector, PythonRuleContext context, PythonTree node, List<String> symbols, List<Hint> result) {
-        CompilationInfo info = context.compilationInfo;
+        PythonParserResult info = (PythonParserResult) context.parserResult;
         OffsetRange range = PythonAstUtils.getNameRange(info, node);
         range = PythonLexerUtils.getLexerOffsets(info, range);
         if (range != OffsetRange.NONE) {
@@ -164,7 +162,7 @@ public class UnusedImports extends PythonAstRule {
             } else {
                 message = NbBundle.getMessage(NameRule.class, "UnusedImport");
             }
-            Hint desc = new Hint(detector, message, info.getFileObject(), range, fixList, 2500);
+            Hint desc = new Hint(detector, message, info.getSnapshot().getSource().getFileObject(), range, fixList, 2500);
             result.add(desc);
         }
     }
@@ -237,7 +235,7 @@ public class UnusedImports extends PythonAstRule {
             BaseDocument doc = context.doc;
             EditList edits = new EditList(doc);
 
-            ImportManager importManager = new ImportManager(context.compilationInfo);
+            ImportManager importManager = new ImportManager((PythonParserResult) context.parserResult);
 
             if (node == null) {
                 if (organizeOnly) {

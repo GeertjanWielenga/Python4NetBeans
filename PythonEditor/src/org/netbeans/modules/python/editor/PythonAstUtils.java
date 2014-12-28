@@ -30,7 +30,6 @@
  */
 package org.netbeans.modules.python.editor;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -48,17 +47,19 @@ import org.netbeans.api.lexer.TokenUtilities;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Finder;
 import org.netbeans.editor.FinderFactory;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.StructureItem;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.parsing.api.ParserManager;
+import org.netbeans.modules.parsing.api.ResultIterator;
+import org.netbeans.modules.parsing.api.Source;
+import org.netbeans.modules.parsing.api.UserTask;
+import org.netbeans.modules.parsing.spi.ParseException;
 import org.netbeans.modules.python.editor.elements.IndexedElement;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
-import org.netbeans.modules.gsf.api.CancellableTask;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.ParserResult;
-import org.netbeans.modules.gsf.api.SourceModel;
-import org.netbeans.modules.gsf.api.SourceModelFactory;
-import org.netbeans.modules.gsf.api.TranslatedSource;
 import org.netbeans.modules.python.editor.lexer.PythonCommentTokenId;
 import org.netbeans.modules.python.editor.scopes.ScopeInfo;
 import org.netbeans.modules.python.editor.scopes.SymbolTable;
@@ -92,60 +93,36 @@ public class PythonAstUtils {
         // This is just a utility class, no instances expected so private constructor
     }
 
-    public static int getAstOffset(CompilationInfo info, int lexOffset) {
-        ParserResult result = info.getEmbeddedResult(PythonTokenId.PYTHON_MIME_TYPE, 0);
+    public static int getAstOffset(ParserResult result, int lexOffset) {
         if (result != null) {
-            TranslatedSource ts = result.getTranslatedSource();
-            if (ts != null) {
-                return ts.getAstOffset(lexOffset);
-            }
+            return result.getSnapshot().getEmbeddedOffset(lexOffset);
         }
 
         return lexOffset;
     }
 
-    public static OffsetRange getAstOffsets(CompilationInfo info, OffsetRange lexicalRange) {
-        ParserResult result = info.getEmbeddedResult(PythonTokenId.PYTHON_MIME_TYPE, 0);
+    public static OffsetRange getAstOffsets(ParserResult result, OffsetRange lexicalRange) {
         if (result != null) {
-            TranslatedSource ts = result.getTranslatedSource();
-            if (ts != null) {
-                int rangeStart = lexicalRange.getStart();
-                int start = ts.getAstOffset(rangeStart);
-                if (start == rangeStart) {
-                    return lexicalRange;
-                } else if (start == -1) {
-                    return OffsetRange.NONE;
-                } else {
-                    // Assumes the translated range maintains size
-                    return new OffsetRange(start, start + lexicalRange.getLength());
-                }
+            int rangeStart = lexicalRange.getStart();
+            int start = result.getSnapshot().getEmbeddedOffset(rangeStart);
+            if (start == rangeStart) {
+                return lexicalRange;
+            } else if (start == -1) {
+                return OffsetRange.NONE;
+            } else {
+                // Assumes the translated range maintains size
+                return new OffsetRange(start, start + lexicalRange.getLength());
             }
         }
         return lexicalRange;
     }
 
-    public static PythonTree getRoot(CompilationInfo info) {
-        return getRoot(info, PythonTokenId.PYTHON_MIME_TYPE);
-    }
-
-    public static PythonParserResult getParseResult(CompilationInfo info) {
-        ParserResult result = info.getEmbeddedResult(PythonTokenId.PYTHON_MIME_TYPE, 0);
-
-        if (result == null) {
+    public static PythonParserResult getParseResult(ParserResult result) {
+        if(result == null || !(result instanceof PythonParserResult)) {
             return null;
         } else {
             return ((PythonParserResult)result);
         }
-    }
-
-    public static PythonTree getRoot(CompilationInfo info, String mimeType) {
-        ParserResult result = info.getEmbeddedResult(mimeType, 0);
-
-        if (result == null) {
-            return null;
-        }
-
-        return getRoot(result);
     }
 
     public static PythonTree getRoot(ParserResult r) {
@@ -160,7 +137,7 @@ public class PythonAstUtils {
      * Return a range that matches the given node's source buffer range
      */
     @SuppressWarnings("unchecked")
-    public static OffsetRange getNameRange(CompilationInfo info, PythonTree node) {
+    public static OffsetRange getNameRange(PythonParserResult info, PythonTree node) {
 //        final int type = node.getType();
 //        switch (type) {
 //        case Token.FUNCTION: {
@@ -218,7 +195,7 @@ public class PythonAstUtils {
                 // but if you have additional comments etc. that won't work right, so
                 // in this case, go and look at the actual document
                 if (info != null) {
-                    BaseDocument doc = (BaseDocument)info.getDocument();
+                    BaseDocument doc = GsfUtilities.getDocument(info.getSnapshot().getSource().getFileObject(), false);
                     if (doc != null) {
                         int lexOffset = PythonLexerUtils.getLexerOffset(info, defStart);
                         int limitOffset = PythonLexerUtils.getLexerOffset(info, def.getCharStopIndex());
@@ -592,36 +569,33 @@ public class PythonAstUtils {
         return null;
     }
 
-    public static PythonTree getForeignNode(final IndexedElement o, CompilationInfo[] compilationInfoRet) {
+    public static PythonTree getForeignNode(final IndexedElement o, PythonParserResult[] parserResultRet) {
         FileObject fo = o.getFileObject();
 
         if (fo == null) {
             return null;
         }
-
-        SourceModel model = SourceModelFactory.getInstance().getModel(fo);
-        if (model == null) {
+        
+        Source source = Source.create(fo);
+        if(source == null) {
             return null;
         }
-        final CompilationInfo[] infoHolder = new CompilationInfo[1];
+        final PythonParserResult[] resultHolder = new PythonParserResult[1];
         try {
-            model.runUserActionTask(new CancellableTask<CompilationInfo>() {
-                public void cancel() {
+            ParserManager.parse(Collections.singleton(source), new UserTask() {
+                
+                @Override
+                public void run(ResultIterator resultIterator) throws Exception {
+                    resultHolder[0] = (PythonParserResult) resultIterator.getParserResult();
                 }
-
-                public void run(CompilationInfo info) throws Exception {
-                    infoHolder[0] = info;
-                }
-                //}, true);
-            }, false); // XXX REMOVE THIS REMOVE THIS REMOVE THIS!
-        } catch (IOException ex) {
+            });
+        } catch (ParseException ex) {
             Exceptions.printStackTrace(ex);
-            return null;
         }
 
-        CompilationInfo info = infoHolder[0];
-        if (compilationInfoRet != null) {
-            compilationInfoRet[0] = info;
+        PythonParserResult info = resultHolder[0];
+        if (parserResultRet != null) {
+            parserResultRet[0] = info;
         }
         PythonParserResult result = getParseResult(info);
         if (result == null) {
@@ -667,7 +641,7 @@ public class PythonAstUtils {
 //        }
 
         ElementKind kind = o.getKind();
-        List<PythonStructureItem> items = result.getStructure().getElements();
+        List<PythonStructureItem> items = PythonStructureScanner.analyze(info).getElements();
         if (items != null) {
             return find(items, signature, kind);
         } else {
@@ -675,21 +649,20 @@ public class PythonAstUtils {
         }
     }
 
-    private static PythonTree find(List<PythonStructureItem> items, String signature, ElementKind kind) {
-        for (PythonStructureItem item : items) {
+    private static PythonTree find(List<? extends StructureItem> items, String signature, ElementKind kind) {
+        for (StructureItem item : items) {
             ElementKind childKind = item.getKind();
             if (childKind == kind &&
-                    signature.equals(item.getSignature())) {
-                return item.getNode();
+                    item instanceof PythonStructureItem &&
+                    signature.equals(((PythonStructureItem)item).getSignature())) {
+                return ((PythonStructureItem)item).getNode();
             }
-            if (childKind == ElementKind.CLASS && signature.indexOf(item.getName()) != -1) {
+            if (childKind == ElementKind.CLASS && signature.contains(item.getName())) {
                 @SuppressWarnings("unchecked")
-                List<PythonStructureItem> children = (List<PythonStructureItem>)item.getNestedItems();
-                if (children != null) {
-                    PythonTree result = find(children, signature, kind);
-                    if (result != null) {
-                        return result;
-                    }
+                List<? extends StructureItem> children = item.getNestedItems();
+                PythonTree result = find(children, signature, kind);
+                if (result != null) {
+                    return result;
                 }
             }
         }
@@ -697,7 +670,7 @@ public class PythonAstUtils {
         return null;
     }
 
-    public static Set<OffsetRange> getAllOffsets(CompilationInfo info, AstPath path, int lexOffset, String name, boolean abortOnFree) {
+    public static Set<OffsetRange> getAllOffsets(PythonParserResult info, AstPath path, int lexOffset, String name, boolean abortOnFree) {
         if (path == null) {
             path = AstPath.get(PythonAstUtils.getRoot(info), lexOffset);
         }
@@ -708,7 +681,7 @@ public class PythonAstUtils {
             return null;
         }
         Set<OffsetRange> offsets = new HashSet<OffsetRange>();
-        Document doc = info.getDocument();
+        Document doc = GsfUtilities.getDocument(info.getSnapshot().getSource().getFileObject(), false);
         if (doc == null) {
             return Collections.emptySet();
         }
@@ -787,7 +760,7 @@ public class PythonAstUtils {
         }
     }
 
-    public static Set<OffsetRange> getLocalVarOffsets(CompilationInfo info, int lexOffset) {
+    public static Set<OffsetRange> getLocalVarOffsets(PythonParserResult info, int lexOffset) {
         int astOffset = getAstOffset(info, lexOffset);
         if (astOffset != -1) {
             PythonTree root = getRoot(info);
@@ -806,7 +779,7 @@ public class PythonAstUtils {
         return Collections.emptySet();
     }
 
-    public static Set<OffsetRange> getLocalVarOffsets(CompilationInfo info, PythonTree scope, String name) {
+    public static Set<OffsetRange> getLocalVarOffsets(PythonParserResult info, PythonTree scope, String name) {
         LocalVarVisitor visitor = new LocalVarVisitor(info, name, false, true);
         try {
             visitor.visit(scope);
@@ -817,7 +790,7 @@ public class PythonAstUtils {
         }
     }
 
-    public static List<Name> getLocalVarNodes(CompilationInfo info, PythonTree scope, String name) {
+    public static List<Name> getLocalVarNodes(PythonParserResult info, PythonTree scope, String name) {
         LocalVarVisitor visitor = new LocalVarVisitor(info, name, true, false);
         try {
             visitor.visit(scope);
@@ -828,7 +801,7 @@ public class PythonAstUtils {
         }
     }
 
-    public static List<Name> getLocalVarAssignNodes(CompilationInfo info, PythonTree scope, String name) {
+    public static List<Name> getLocalVarAssignNodes(PythonParserResult info, PythonTree scope, String name) {
         LocalVarAssignVisitor visitor = new LocalVarAssignVisitor(info, name, true, false);
         try {
             visitor.visit(scope);
@@ -843,12 +816,12 @@ public class PythonAstUtils {
         private List<Name> vars = new ArrayList<Name>();
         private Set<OffsetRange> offsets = new HashSet<OffsetRange>();
         private String name;
-        private CompilationInfo info;
+        private PythonParserResult info;
         private boolean collectNames;
         private boolean collectOffsets;
         private PythonTree parent;
 
-        private LocalVarVisitor(CompilationInfo info, String name, boolean collectNames, boolean collectOffsets) {
+        private LocalVarVisitor(PythonParserResult info, String name, boolean collectNames, boolean collectOffsets) {
             this.info = info;
             this.name = name;
             this.collectNames = collectNames;
@@ -899,12 +872,12 @@ public class PythonAstUtils {
         private List<Name> vars = new ArrayList<Name>();
         private Set<OffsetRange> offsets = new HashSet<OffsetRange>();
         private String name;
-        private CompilationInfo info;
+        private PythonParserResult info;
         private boolean collectNames;
         private boolean collectOffsets;
         private PythonTree parent;
 
-        private LocalVarAssignVisitor(CompilationInfo info, String name, boolean collectNames, boolean collectOffsets) {
+        private LocalVarAssignVisitor(PythonParserResult info, String name, boolean collectNames, boolean collectOffsets) {
             this.info = info;
             this.name = name;
             this.collectNames = collectNames;

@@ -52,7 +52,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -76,27 +75,12 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
 import org.netbeans.api.editor.settings.SimpleValueNames;
-import org.netbeans.modules.gsf.api.CancellableTask;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.SourceModel;
-import org.netbeans.modules.gsf.api.SourceModelFactory;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
-import org.netbeans.modules.gsfpath.api.classpath.ClassPath;
-import org.netbeans.modules.gsfpath.spi.classpath.support.ClassPathSupport;
-import org.netbeans.modules.python.editor.PythonLanguage;
 import static org.netbeans.modules.python.editor.options.CodeStyle.*;
 import org.netbeans.modules.options.editor.spi.PreferencesCustomizer;
 import org.netbeans.modules.options.editor.spi.PreviewProvider;
-
-import org.netbeans.modules.python.api.PythonPlatform;
-import org.netbeans.modules.python.api.PythonPlatformManager;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.PythonFormatter;
-import org.netbeans.modules.python.editor.lexer.PythonTokenId;
-import org.netbeans.napi.gsfret.source.ClasspathInfo;
-import org.netbeans.napi.gsfret.source.CompilationController;
-import org.netbeans.napi.gsfret.source.Phase;
-import org.netbeans.napi.gsfret.source.Source;
-import org.netbeans.napi.gsfret.source.SourceUtils;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.openide.cookies.SaveCookie;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
@@ -563,7 +547,7 @@ public class FmtOptions {
                 previewPane.getAccessibleContext().setAccessibleName(NbBundle.getMessage(FmtOptions.class, "AN_Preview")); //NOI18N
                 previewPane.getAccessibleContext().setAccessibleDescription(NbBundle.getMessage(FmtOptions.class, "AD_Preview")); //NOI18N
                 previewPane.putClientProperty("HighlightsLayerIncludes", "^org\\.netbeans\\.modules\\.editor\\.lib2\\.highlighting\\.SyntaxHighlighting$"); //NOI18N
-                previewPane.setEditorKit(CloneableEditorSupport.getEditorKit(PythonTokenId.PYTHON_MIME_TYPE));
+                previewPane.setEditorKit(CloneableEditorSupport.getEditorKit(PythonMIMEResolver.PYTHON_MIME_TYPE));
                 previewPane.setEditable(false);
             }
             return previewPane;
@@ -606,7 +590,7 @@ public class FmtOptions {
             // to create a temp file, format it, then save it and delete it
             // (to avoid save confirmation dialogs on the modified file etc)
             PythonFormatter formatter = new PythonFormatter(codeStyle);
-            CompilationInfo info = null;
+            PythonParserResult info = null;
             File tmp = null;
             FileObject tmpFo = null;
             if (formatter.needsParserResult()) {
@@ -619,55 +603,55 @@ public class FmtOptions {
                     tmpFo = fo;
                     // TODO - I need to get the classpath involved here such that it can
                     // find used/unused libraries
-                    if (!SourceUtils.isScanInProgress()) {
-                        // I'm using custom GSF code here because I want to set up an explicit
-                        // source path for the fake file object which includes the Python
-                        // libraries (since we need them for the isSystemModule lookup
-                        //SourceModel model = SourceModelFactory.getInstance().getModel(fo);
-                        //if (model != null && !model.isScanInProgress()) {
-                        List<FileObject> roots = new ArrayList<FileObject>(new PythonLanguage().getCoreLibraries());
-
-                        final PythonPlatformManager manager = PythonPlatformManager.getInstance();
-                        final String platformName = manager.getDefaultPlatform();
-                        PythonPlatform activePlatform = manager.getPlatform(platformName);
-                        if (activePlatform != null) {
-                            roots.addAll(activePlatform.getUniqueLibraryRoots());
-                            ClassPath boot = ClassPathSupport.createClassPath(roots.toArray(new FileObject[roots.size()]));
-                            ClassPath source = ClassPathSupport.createClassPath(new FileObject[]{fo.getParent()});
-                            ClassPath compile = source;
-
-                            ClasspathInfo cpInfo = ClasspathInfo.create(boot, compile, source);
-                            Source model = Source.create(cpInfo, fo);
-                            if (model != null) {
-                                final CompilationInfo[] infoHolder = new CompilationInfo[1];
-                                //model.runUserActionTask(new CancellableTask<CompilationInfo>() {
-                                model.runUserActionTask(new CancellableTask<CompilationController>() {
-                                    public void cancel() {
-                                    }
-
-                                    //public void run(CompilationInfo info) throws Exception {
-                                    public void run(CompilationController info) throws Exception {
-                                        info.toPhase(Phase.RESOLVED);
-                                        infoHolder[0] = info;
-                                        // Force open so info.getFileObject will succeed
-                                        GsfUtilities.getDocument(fo, true);
-                                    }
-                                }, false);
-                                info = infoHolder[0];
-                            }
-                        }
-                    }
+//                    if (!SourceUtils.isScanInProgress()) {
+//                        // I'm using custom GSF code here because I want to set up an explicit
+//                        // source path for the fake file object which includes the Python
+//                        // libraries (since we need them for the isSystemModule lookup
+//                        //SourceModel model = SourceModelFactory.getInstance().getModel(fo);
+//                        //if (model != null && !model.isScanInProgress()) {
+//                        List<FileObject> roots = new ArrayList<FileObject>(new PythonLanguage().getCoreLibraries());
+//
+//                        final PythonPlatformManager manager = PythonPlatformManager.getInstance();
+//                        final String platformName = manager.getDefaultPlatform();
+//                        PythonPlatform activePlatform = manager.getPlatform(platformName);
+//                        if (activePlatform != null) {
+//                            roots.addAll(activePlatform.getUniqueLibraryRoots());
+//                            ClassPath boot = ClassPathSupport.createClassPath(roots.toArray(new FileObject[roots.size()]));
+//                            ClassPath source = ClassPathSupport.createClassPath(new FileObject[]{fo.getParent()});
+//                            ClassPath compile = source;
+//
+//                            ClasspathInfo cpInfo = ClasspathInfo.create(boot, compile, source);
+//                            Source model = Source.create(cpInfo, fo);
+//                            if (model != null) {
+//                                final CompilationInfo[] infoHolder = new CompilationInfo[1];
+//                                //model.runUserActionTask(new CancellableTask<CompilationInfo>() {
+//                                model.runUserActionTask(new CancellableTask<CompilationController>() {
+//                                    public void cancel() {
+//                                    }
+//
+//                                    //public void run(CompilationInfo info) throws Exception {
+//                                    public void run(CompilationController info) throws Exception {
+//                                        info.toPhase(Phase.RESOLVED);
+//                                        infoHolder[0] = info;
+//                                        // Force open so info.getFileObject will succeed
+//                                        GsfUtilities.getDocument(fo, true);
+//                                    }
+//                                }, false);
+//                                info = infoHolder[0];
+//                            }
+//                        }
+//                    }
                 } catch (IOException ex) {
                     Exceptions.printStackTrace(ex);
                 }
             }
             try {
-                if (info != null && info.getDocument() != null) {
-                    Document doc = info.getDocument();
+                if (info != null && info.getSnapshot().getSource().getDocument(false) != null) {
+                    Document doc = info.getSnapshot().getSource().getDocument(false);
                     formatter.reformat(null, doc, 0, doc.getLength(), info);
                     jep.setText(doc.getText(0, doc.getLength()));
                     // Save file to avoid warning on exit
-                    DataObject dobj = DataObject.find(info.getFileObject());
+                    DataObject dobj = DataObject.find(info.getSnapshot().getSource().getFileObject());
                     SaveCookie cookie = dobj.getCookie(SaveCookie.class);
                     if (cookie != null) {
                         cookie.save();

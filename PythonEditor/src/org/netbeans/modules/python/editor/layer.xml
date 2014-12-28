@@ -142,7 +142,7 @@
         </folder>
     </folder>
     
-    <folder name="gsf-hints">
+    <folder name="csl-hints">
         <folder name="text">
             <folder name="x-python">
                 <folder name="hints">
@@ -173,11 +173,11 @@
         </folder>
     </folder>
     
-    <folder name="GsfPlugins">
+    <folder name="CslPlugins">
         <folder name="text">
             <folder name="x-python">
                 <file name="language.instance">
-                    <attr name="instanceOf" stringvalue="org.netbeans.modules.gsf.api.GsfLanguage"/>
+<!--                    <attr name="instanceOf" stringvalue="org.netbeans.modules.gsf.api.GsfLanguage"/>-->
                     <attr name="instanceClass" stringvalue="org.netbeans.modules.python.editor.PythonLanguage"/>
                 </file>
                 <file name="structure.instance">

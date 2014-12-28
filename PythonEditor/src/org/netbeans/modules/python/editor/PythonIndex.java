@@ -36,6 +36,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -44,12 +45,20 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.netbeans.api.project.Project;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.parsing.spi.indexing.PathRecognizer;
+import org.netbeans.modules.parsing.spi.indexing.support.IndexResult;
+import org.netbeans.modules.parsing.spi.indexing.support.QuerySupport;
+import static org.netbeans.modules.parsing.spi.indexing.support.QuerySupport.Kind.CAMEL_CASE;
+import static org.netbeans.modules.parsing.spi.indexing.support.QuerySupport.Kind.CASE_INSENSITIVE_PREFIX;
+import static org.netbeans.modules.parsing.spi.indexing.support.QuerySupport.Kind.CASE_INSENSITIVE_REGEXP;
+import static org.netbeans.modules.parsing.spi.indexing.support.QuerySupport.Kind.PREFIX;
+import static org.netbeans.modules.parsing.spi.indexing.support.QuerySupport.Kind.REGEXP;
 import org.netbeans.modules.python.editor.elements.IndexedElement;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.api.Index;
-import org.netbeans.modules.gsf.api.Index.SearchResult;
-import org.netbeans.modules.gsf.api.Index.SearchScope;
-import org.netbeans.modules.gsf.api.NameKind;
 import org.netbeans.modules.python.api.PythonPlatform;
 import org.netbeans.modules.python.api.PythonPlatformManager;
 import org.netbeans.modules.python.editor.elements.IndexedPackage;
@@ -59,6 +68,7 @@ import org.openide.filesystems.FileStateInvalidException;
 import org.openide.filesystems.URLMapper;
 import org.openide.modules.InstalledFileLocator;
 import org.openide.util.Exceptions;
+import org.openide.util.Lookup;
 import org.python.antlr.ast.Import;
 import org.python.antlr.ast.ImportFrom;
 import org.python.antlr.ast.alias;
@@ -69,19 +79,24 @@ import org.python.antlr.ast.alias;
  * @author Tor Norbye
  */
 public class PythonIndex {
-    public static final Set<SearchScope> ALL_SCOPE = EnumSet.allOf(SearchScope.class);
-    public static final Set<SearchScope> SOURCE_SCOPE = EnumSet.of(SearchScope.SOURCE);
+//    public static final Set<SearchScope> ALL_SCOPE = EnumSet.allOf(SearchScope.class);
+//    public static final Set<SearchScope> SOURCE_SCOPE = EnumSet.of(SearchScope.SOURCE);
     static final String CLUSTER_URL = "cluster:"; // NOI18N
     static final String PYTHONHOME_URL = "python:"; // NOI18N
     private static final String STUB_MISSING = "stub_missing"; // NOI18N
-    private final Index index;
-    private final FileObject context;
 
     // The "functions" module is always imported by the interpreter, and ditto
     // for exceptions, constants, etc.
     public static Set<String> BUILTIN_MODULES = new HashSet<String>();
 
 
+    private static final Logger LOG = Logger.getLogger(PythonIndex.class.getName());
+    public static final String OBJECT = "object"; // NOI18N
+    static Map<String, Set<String>> wildcardImports = new HashMap<String, Set<String>>();
+    static Set<String> systemModules;
+    // TODO - make weak?
+    static Set<String> availableClasses;
+    private static String clusterUrl = null;
     static {
         //BUILTIN_MODULES.add("objects"); // NOI18N -- just links to the others
         BUILTIN_MODULES.add("stdtypes"); // NOI18N
@@ -91,25 +106,179 @@ public class PythonIndex {
         BUILTIN_MODULES.add("constants"); // NOI18N
     }
 
-    /** Creates a new instance of PythonIndex */
-    private PythonIndex(Index index, FileObject context) {
-        this.index = index;
-        this.context = context;
+    public static PythonIndex get(Collection<FileObject> roots) {
+        // XXX no cache - is it needed?
+        LOG.log(Level.FINE, "PythonIndex for roots: {0}", roots); //NOI18N
+        return new PythonIndex(QuerySupportFactory.get(roots), false);
+    }
+    
+    public static PythonIndex get(Project project) {
+        Set<String> sourceIds = new HashSet<String>();
+        Set<String> libraryIds = new HashSet<String>();
+        Collection<? extends PathRecognizer> lookupAll = Lookup.getDefault().lookupAll(PathRecognizer.class);
+        for (PathRecognizer pathRecognizer : lookupAll) {
+            Set<String> source = pathRecognizer.getSourcePathIds();
+            if (source != null) {
+                sourceIds.addAll(source);
+            }
+            Set<String> library = pathRecognizer.getLibraryPathIds();
+            if (library != null) {
+                libraryIds.addAll(library);
+            }
+        }
+
+        final Collection<FileObject> findRoots = QuerySupport.findRoots(project,
+                sourceIds,
+                libraryIds,
+                Collections.<String>emptySet());
+        return PythonIndex.get(findRoots);
+    }
+    
+    private static final WeakHashMap<FileObject, PythonIndex> INDEX_CACHE = new WeakHashMap<FileObject, PythonIndex>();
+    public static PythonIndex get(FileObject fo) {
+        PythonIndex index = INDEX_CACHE.get(fo);
+        if (index == null) {
+            LOG.log(Level.FINE, "Creating PythonIndex for FileObject: {0}", fo); //NOI18N
+            index = new PythonIndex(QuerySupportFactory.get(fo), true);
+            INDEX_CACHE.put(fo, index);
+        }
+        return index;
     }
 
-    public static PythonIndex get(Index index) {
-        return new PythonIndex(index, null);
+    public static boolean isBuiltinModule(String module) {
+        return BUILTIN_MODULES.contains(module) || STUB_MISSING.equals(module);
     }
 
-    public static PythonIndex get(Index index, FileObject context) {
-        return new PythonIndex(index, context);
+    // For testing only
+    public static void setClusterUrl(String url) {
+        clusterUrl = url;
     }
 
-    private boolean search(String key, String name, NameKind kind, Set<SearchResult> result,
-            Set<SearchScope> scope, Set<String> terms) {
+    static String getPreindexUrl(String url) {
+        // TODO - look up the correct platform to use!
+        final PythonPlatformManager manager = PythonPlatformManager.getInstance();
+        final String platformName = manager.getDefaultPlatform();
+        PythonPlatform platform = manager.getPlatform(platformName);
+        if (platform != null) {
+            String s = platform.getHomeUrl();
+            if (s != null) {
+                if (url.startsWith(s)) {
+                    url = PYTHONHOME_URL + url.substring(s.length());
+                    return url;
+                }
+            }
+        }
+        
+        String s = getClusterUrl();
+        
+        if (url.startsWith(s)) {
+            return CLUSTER_URL + url.substring(s.length());
+        }
+        
+        if (url.startsWith("jar:file:")) { // NOI18N
+            String sub = url.substring(4);
+            if (sub.startsWith(s)) {
+                return CLUSTER_URL + sub.substring(s.length());
+            }
+        }
+        
+        return url;
+    }
+
+/** Get the FileObject corresponding to a URL returned from the index */
+    public static FileObject getFileObject(String url) {
+        return getFileObject(url, null);
+    }
+
+    public static FileObject getFileObject(String url, FileObject context) {
         try {
-            index.search(key, name, kind, scope, result, terms);
+            if (url.startsWith(PYTHONHOME_URL)) {
+                Iterator<String> it = null;
+                
+                // TODO - look up the right platform for the given project
+                //if (context != null) {
+                //    Project project = FileOwnerQuery.getOwner(context);
+                //    if (project != null) {
+                //        PythonPlatform platform = PythonPlatform.platformFor(project);
+                //        if (platform != null) {
+                //            it = Collections.singleton(platform).iterator();
+                //        }
+                //    }
+                //}
+                
+                PythonPlatformManager manager = PythonPlatformManager.getInstance();
+                if (it == null) {
+                    it = manager.getPlatformList().iterator();
+                }
+                while (it.hasNext()) {
+                    String name = it.next();
+                    PythonPlatform platform = manager.getPlatform(name);
+                    if (platform != null) {
+                        String u = platform.getHomeUrl();
+                        if (u != null) {
+                            try {
+                                u = u + url.substring(PYTHONHOME_URL.length());
+                                FileObject fo = URLMapper.findFileObject(new URL(u));
+                                if (fo != null) {
+                                    return fo;
+                                }
+                            } catch (MalformedURLException mue) {
+                                Exceptions.printStackTrace(mue);
+                            }
+                        }
+                    }
+                }
+                
+                return null;
+            } else if (url.startsWith(CLUSTER_URL)) {
+                url = getClusterUrl() + url.substring(CLUSTER_URL.length()); // NOI18N
+                if (url.indexOf(".egg!/") != -1) { // NOI18N
+                    url = "jar:" + url; // NOI18N
+                }
+            }
+            
+            return URLMapper.findFileObject(new URL(url));
+        } catch (IOException ex) {
+            Exceptions.printStackTrace(ex);
+        }
+        
+        return null;
+    }
+    
+    static String getClusterUrl() {
+        if (clusterUrl == null) {
+            File f =
+                    InstalledFileLocator.getDefault().locate("modules/org-netbeans-modules-python-editor.jar", null, false); // NOI18N
+            
+            if (f == null) {
+                throw new RuntimeException("Can't find cluster");
+            }
+            
+            f = new File(f.getParentFile().getParentFile().getAbsolutePath());
+            
+            try {
+                f = f.getCanonicalFile();
+                clusterUrl = f.toURI().toURL().toExternalForm();
+            } catch (IOException ioe) {
+                Exceptions.printStackTrace(ioe);
+            }
+        }
 
+        return clusterUrl;
+    }
+
+    private final QuerySupport index;
+    private final boolean updateCache;
+    
+    /** Creates a new instance of PythonIndex */
+    private PythonIndex(QuerySupport index, boolean updateCache) {
+        this.index = index;
+        this.updateCache = updateCache;
+    }
+    
+    private boolean search(String fieldName, String fieldValue, QuerySupport.Kind kind, Set<? super IndexResult> result, final String... fieldsToLoad) {
+        try {
+            result.addAll(index.query(fieldName, fieldValue, kind, fieldsToLoad));
             return true;
         } catch (IOException ioe) {
             Exceptions.printStackTrace(ioe);
@@ -120,8 +289,8 @@ public class PythonIndex {
         }
     }
 
-    public Set<IndexedElement> getModules(String name, final NameKind kind) {
-        final Set<SearchResult> result = new HashSet<SearchResult>();
+    public Set<IndexedElement> getModules(String name, final QuerySupport.Kind kind) {
+        final Set<IndexResult> result = new HashSet<IndexResult>();
 
         //        if (!isValid()) {
         //            LOGGER.fine(String.format("LuceneIndex[%s] is invalid!\n", this.toString()));
@@ -130,32 +299,30 @@ public class PythonIndex {
 
         // TODO - handle case insensitive searches etc?
         String field = PythonIndexer.FIELD_MODULE_NAME;
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_MODULE_ATTR_NAME);
-        terms.add(PythonIndexer.FIELD_MODULE_NAME);
 
-        search(field, name, kind, result, ALL_SCOPE, terms);
+        search(field, name, kind, result, PythonIndexer.FIELD_MODULE_ATTR_NAME, PythonIndexer.FIELD_MODULE_NAME);
 
         final Set<IndexedElement> modules = new HashSet<IndexedElement>();
 
-        for (SearchResult map : result) {
-            String url = map.getPersistentUrl();
+        for (IndexResult map : result) {
+            URL url = map.getUrl();
             if (url == null) {
                 continue;
             }
+            String path = url.toExternalForm();
             String module = map.getValue(PythonIndexer.FIELD_MODULE_NAME);
             if (STUB_MISSING.equals(module)) {
                 continue;
             }
 
-            IndexedElement element = new IndexedElement(module, ElementKind.MODULE, url, null, null, null);
+            IndexedElement element = new IndexedElement(module, ElementKind.MODULE, path, null, null, null);
 
             String attrs = map.getValue(PythonIndexer.FIELD_MODULE_ATTR_NAME);
             if (attrs != null && attrs.indexOf('D') != -1) {
                 element.setFlags(IndexedElement.DEPRECATED);
             }
 
-            String rhs = url.substring(url.lastIndexOf('/') + 1);
+            String rhs = path.substring(path.lastIndexOf('/') + 1);
             element.setRhs(rhs);
             modules.add(element);
         }
@@ -163,15 +330,15 @@ public class PythonIndex {
         return modules;
     }
 
-    public Set<IndexedPackage> getPackages(String name, final NameKind kind) {
-        final Set<SearchResult> result = new HashSet<SearchResult>();
+    public Set<IndexedPackage> getPackages(String name, final QuerySupport.Kind kind) {
+        final Set<IndexResult> result = new HashSet<IndexResult>();
 
         String field = PythonIndexer.FIELD_MODULE_NAME;
-        search(field, name, kind, result, ALL_SCOPE, Collections.singleton(PythonIndexer.FIELD_MODULE_NAME));
+        search(field, name, kind, result, PythonIndexer.FIELD_MODULE_NAME);
 
         final Set<IndexedPackage> packages = new HashSet<IndexedPackage>();
 
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
             String module = map.getValue(PythonIndexer.FIELD_MODULE_NAME);
 
             String pkgName = null;
@@ -199,7 +366,7 @@ public class PythonIndex {
             }
 
             if (pkgName != null) {
-                String url = map.getPersistentUrl();
+                String url = map.getUrl().toExternalForm();
                 IndexedPackage element = new IndexedPackage(pkgName, pkg, url, nextNextDot != -1);
                 element.setRhs("");
                 packages.add(element);
@@ -208,10 +375,9 @@ public class PythonIndex {
 
         return packages;
     }
-
-    public Set<IndexedElement> getClasses(String name, final NameKind kind, Set<SearchScope> scope,
-            PythonParserResult context, boolean includeDuplicates) {
-        final Set<SearchResult> result = new HashSet<SearchResult>();
+    
+    public Set<IndexedElement> getClasses(String name, final QuerySupport.Kind kind, PythonParserResult context, boolean includeDuplicates) {
+        final Set<IndexResult> result = new HashSet<IndexResult>();
 
         //        if (!isValid()) {
         //            LOGGER.fine(String.format("LuceneIndex[%s] is invalid!\n", this.toString()));
@@ -220,42 +386,37 @@ public class PythonIndex {
         String field;
 
         switch (kind) {
-        case EXACT_NAME:
-        case PREFIX:
-        case CAMEL_CASE:
-        case REGEXP:
-            field = PythonIndexer.FIELD_CLASS_NAME;
-
-            break;
-
-        case CASE_INSENSITIVE_PREFIX:
-        case CASE_INSENSITIVE_REGEXP:
-            field = PythonIndexer.FIELD_CASE_INSENSITIVE_CLASS_NAME;
-
-            break;
-
-        default:
-            throw new UnsupportedOperationException(kind.toString());
+            case EXACT:
+            case PREFIX:
+            case CAMEL_CASE:
+            case REGEXP:
+                field = PythonIndexer.FIELD_CLASS_NAME;
+                
+                break;
+                
+            case CASE_INSENSITIVE_PREFIX:
+            case CASE_INSENSITIVE_REGEXP:
+                field = PythonIndexer.FIELD_CASE_INSENSITIVE_CLASS_NAME;
+                
+                break;
+                
+            default:
+                throw new UnsupportedOperationException(kind.toString());
         }
 
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_IN);
-        terms.add(PythonIndexer.FIELD_CLASS_ATTR_NAME);
-        terms.add(PythonIndexer.FIELD_CLASS_NAME);
-
-        search(field, name, kind, result, scope, terms);
+        search(field, name, kind, result, PythonIndexer.FIELD_IN, PythonIndexer.FIELD_CLASS_ATTR_NAME, PythonIndexer.FIELD_CLASS_NAME);
 
         Set<String> uniqueClasses = includeDuplicates ? null : new HashSet<String>();
 
         final Set<IndexedElement> classes = new HashSet<IndexedElement>();
 
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
             String clz = map.getValue(PythonIndexer.FIELD_CLASS_NAME);
             if (clz == null) {
                 // A module without classes
                 continue;
             }
-            String url = map.getPersistentUrl();
+            String url = map.getUrl().toExternalForm();
             String module = map.getValue(PythonIndexer.FIELD_IN);
             boolean isBuiltin = isBuiltinModule(module);
 
@@ -290,7 +451,7 @@ public class PythonIndex {
 //     * @todo Use arglist arity comparison to reject methods that are not overrides...
 //     */
 //    public IndexedMethod getOverridingMethod(String className, String methodName) {
-//        Set<IndexedElement> methods = getInheritedElements(className, methodName, NameKind.EXACT_NAME);
+//        Set<IndexedElement> methods = getInheritedElements(className, methodName, QuerySupport.Kind.EXACT);
 //
 //        // TODO - this is only returning ONE match, not the most distant one. I really need to
 //        // produce a PythonIndex method for this which can walk in there and do a decent job!
@@ -308,7 +469,7 @@ public class PythonIndex {
 //    }
     /** Get the super implementation of the given method */
     public Set<IndexedElement> getOverridingMethods(String className, String function) {
-        Set<IndexedElement> methods = getInheritedElements(className, function, NameKind.EXACT_NAME, true);
+        Set<IndexedElement> methods = getInheritedElements(className, function, QuerySupport.Kind.EXACT, true);
 
         // TODO - remove all methods that are in the same file
         if (methods.size() > 0) {
@@ -339,16 +500,12 @@ public class PythonIndex {
 
     /** Get the super class of the given class */
     public Set<IndexedElement> getSuperClasses(String className) {
-        final Set<SearchResult> result = new HashSet<SearchResult>();
-        Set<String> terms = new HashSet<String>(5);
-//        terms.add(PythonIndexer.FIELD_IN);
-        terms.add(PythonIndexer.FIELD_EXTENDS_NAME);
-        terms.add(PythonIndexer.FIELD_CLASS_NAME);
+        final Set<IndexResult> result = new HashSet<IndexResult>();
 
-        search(PythonIndexer.FIELD_CLASS_NAME, className, NameKind.EXACT_NAME, result, ALL_SCOPE, terms);
+        search(PythonIndexer.FIELD_CLASS_NAME, className, QuerySupport.Kind.EXACT, result, PythonIndexer.FIELD_EXTENDS_NAME, PythonIndexer.FIELD_CLASS_NAME);
 
         Set<String> classNames = new HashSet<String>();
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
             String[] extendsClasses = map.getValues(PythonIndexer.FIELD_EXTENDS_NAME);
             if (extendsClasses != null && extendsClasses.length > 0) {
                 for (String clzName : extendsClasses) {
@@ -357,18 +514,16 @@ public class PythonIndex {
             }
         }
 
-        terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_IN);
-        terms.add(PythonIndexer.FIELD_CLASS_NAME);
+        String[] terms = { PythonIndexer.FIELD_IN, PythonIndexer.FIELD_CLASS_NAME };
 
         Set<IndexedElement> superClasses = new HashSet<IndexedElement>();
 
         for (String superClz : classNames) {
             result.clear();
-            search(PythonIndexer.FIELD_CLASS_NAME, superClz, NameKind.EXACT_NAME, result, ALL_SCOPE, terms);
-            for (SearchResult map : result) {
+            search(PythonIndexer.FIELD_CLASS_NAME, superClz, QuerySupport.Kind.EXACT, result, terms);
+            for (IndexResult map : result) {
                 assert superClz.equals(map.getValue(PythonIndexer.FIELD_CLASS_NAME));
-                String url = map.getPersistentUrl();
+                String url = map.getUrl().toExternalForm();
                 String module = map.getValue(PythonIndexer.FIELD_IN);
                 IndexedElement clz = new IndexedElement(superClz, ElementKind.CLASS, url, module, null, null);
                 superClasses.add(clz);
@@ -381,15 +536,15 @@ public class PythonIndex {
     /**
      * Get the set of inherited (through super classes and mixins) for the given fully qualified class name.
      * @param classFqn FQN: module1::module2::moduleN::class
-     * @param prefix If kind is NameKind.PREFIX/CASE_INSENSITIVE_PREFIX, a prefix to filter methods by. Else,
-     *    if kind is NameKind.EXACT_NAME filter methods by the exact name.
+     * @param prefix If kind is QuerySupport.Kind.PREFIX/CASE_INSENSITIVE_PREFIX, a prefix to filter methods by. Else,
+     *    if kind is QuerySupport.Kind.EXACT filter methods by the exact name.
      * @param kind Whether the prefix field should be taken as a prefix or a whole name
      */
-    public Set<IndexedElement> getInheritedElements(String classFqn, String prefix, NameKind kind) {
+    public Set<IndexedElement> getInheritedElements(String classFqn, String prefix, QuerySupport.Kind kind) {
         return getInheritedElements(classFqn, prefix, kind, false);
     }
 
-    public Set<IndexedElement> getInheritedElements(String classFqn, String prefix, NameKind kind, boolean includeOverrides) {
+    public Set<IndexedElement> getInheritedElements(String classFqn, String prefix, QuerySupport.Kind kind, boolean includeOverrides) {
         boolean haveRedirected = false;
 
         if (classFqn == null) {
@@ -421,15 +576,11 @@ public class PythonIndex {
         return elements;
     }
 
-    public static final String OBJECT = "object"; // NOI18N
-
     /** Return whether the specific class referenced (classFqn) was found or not. This is
      * not the same as returning whether any classes were added since it may add
      * additional methods from parents (Object/Class).
      */
-    private boolean addMethodsFromClass(String prefix, NameKind kind, String classFqn,
-            Set<IndexedElement> elements, Set<String> seenSignatures, Set<String> scannedClasses,
-            boolean haveRedirected, boolean inheriting, boolean includeOverrides, int depth) {
+    private boolean addMethodsFromClass(String prefix, QuerySupport.Kind kind, String classFqn, Set<IndexedElement> elements, Set<String> seenSignatures, Set<String> scannedClasses, boolean haveRedirected, boolean inheriting, boolean includeOverrides, int depth) {
         // Prevent problems with circular includes or redundant includes
         if (scannedClasses.contains(classFqn)) {
             return false;
@@ -439,16 +590,15 @@ public class PythonIndex {
 
         String searchField = PythonIndexer.FIELD_CLASS_NAME;
 
-        Set<SearchResult> result = new HashSet<SearchResult>();
+        Set<IndexResult> result = new HashSet<IndexResult>();
 
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_IN);
-        terms.add(PythonIndexer.FIELD_EXTENDS_NAME);
-        terms.add(PythonIndexer.FIELD_MEMBER);
-        terms.add(PythonIndexer.FIELD_CLASS_NAME);
-
-
-        search(searchField, classFqn, NameKind.EXACT_NAME, result, ALL_SCOPE, terms);
+        String[] terms = {PythonIndexer.FIELD_IN,
+                          PythonIndexer.FIELD_EXTENDS_NAME,
+                          PythonIndexer.FIELD_MEMBER,
+                          PythonIndexer.FIELD_CLASS_NAME};
+        
+        
+        search(searchField, classFqn, QuerySupport.Kind.EXACT, result, terms);
 
         boolean foundIt = result.size() > 0;
 
@@ -467,10 +617,10 @@ public class PythonIndex {
         }
         int prefixLength = prefix.length();
 
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
             assert map != null;
 
-            String url = map.getPersistentUrl();
+            String url = map.getUrl().toExternalForm();
             String clz = map.getValue(PythonIndexer.FIELD_CLASS_NAME);
             String module = map.getValue(PythonIndexer.FIELD_IN);
 
@@ -493,16 +643,16 @@ public class PythonIndex {
                     // Prevent duplicates when method is redefined
                     if (includeOverrides || !seenSignatures.contains(signature)) {
                         if (signature.startsWith(prefix)) {
-                            if (kind == NameKind.EXACT_NAME) {
+                            if (kind == QuerySupport.Kind.EXACT) {
                                 if (signature.charAt(prefixLength) != ';') {
                                     continue;
                                 }
-                            } else if (kind == NameKind.CASE_INSENSITIVE_PREFIX && !signature.regionMatches(true, 0, prefix, 0, prefix.length())) {
+                            } else if (kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX && !signature.regionMatches(true, 0, prefix, 0, prefix.length())) {
                                 continue;
                             } else {
                                 // REGEXP, CAMELCASE filtering etc. not supported here
-                                assert (kind == NameKind.PREFIX) ||
-                                        (kind == NameKind.CASE_INSENSITIVE_PREFIX);
+                                assert (kind == QuerySupport.Kind.PREFIX) ||
+                                        (kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX);
                             }
 
                             if (!includeOverrides) {
@@ -558,36 +708,31 @@ public class PythonIndex {
 
         return foundIt;
     }
-
-    public Set<IndexedElement> getAllMembers(String name, NameKind kind, Set<SearchScope> scope,
-            PythonParserResult context, boolean includeDuplicates) {
-        final Set<SearchResult> result = new HashSet<SearchResult>();
+    
+    
+    public Set<IndexedElement> getAllMembers(String name, QuerySupport.Kind kind, PythonParserResult context, boolean includeDuplicates) {
+        final Set<IndexResult> result = new HashSet<IndexResult>();
         // TODO - handle case sensitivity better...
         String field = PythonIndexer.FIELD_MEMBER;
-        NameKind originalKind = kind;
-        if (kind == NameKind.EXACT_NAME) {
+        QuerySupport.Kind originalKind = kind;
+        if (kind == QuerySupport.Kind.EXACT) {
             // I can't do exact searches on methods because the method
             // entries include signatures etc. So turn this into a prefix
             // search and then compare chopped off signatures with the name
-            kind = NameKind.PREFIX;
+            kind = QuerySupport.Kind.PREFIX;
         }
 
         String searchUrl = null;
         if (context != null) {
-            try {
-                searchUrl = context.getFile().getFileObject().getURL().toExternalForm();
-            } catch (FileStateInvalidException ex) {
-                Exceptions.printStackTrace(ex);
-            }
+            searchUrl = context.getSnapshot().getSource().getFileObject().toURL().toExternalForm();
         }
 
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_IN);
-        terms.add(PythonIndexer.FIELD_EXTENDS_NAME);
-        terms.add(PythonIndexer.FIELD_MEMBER);
-        terms.add(PythonIndexer.FIELD_CLASS_NAME);
+        String[] terms = {PythonIndexer.FIELD_IN,
+                          PythonIndexer.FIELD_EXTENDS_NAME,
+                          PythonIndexer.FIELD_MEMBER,
+                          PythonIndexer.FIELD_CLASS_NAME};
 
-        search(field, name, kind, result, scope, terms);
+        search(field, name, kind, result, terms);
 
 //        Set<String> uniqueClasses = null;
 //        if (includeDuplicates) {
@@ -599,25 +744,25 @@ public class PythonIndex {
         final Set<IndexedElement> members = new HashSet<IndexedElement>();
         int nameLength = name.length();
 
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
             String[] signatures = map.getValues(PythonIndexer.FIELD_MEMBER);
             if (signatures != null && signatures.length > 0) {
-                String url = map.getPersistentUrl();
+                String url = map.getUrl().toExternalForm();
                 String clz = map.getValue(PythonIndexer.FIELD_CLASS_NAME);
                 String module = map.getValue(PythonIndexer.FIELD_IN);
                 boolean inherited = searchUrl == null || !searchUrl.equals(url);
 
                 for (String signature : signatures) {
-                    if (originalKind == NameKind.EXACT_NAME) {
+                    if (originalKind == QuerySupport.Kind.EXACT) {
                         if (signature.charAt(nameLength) != ';') {
                             continue;
                         }
-                    } else if (originalKind == NameKind.CASE_INSENSITIVE_PREFIX && !signature.regionMatches(true, 0, name, 0, name.length())) {
+                    } else if (originalKind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX && !signature.regionMatches(true, 0, name, 0, name.length())) {
                         continue;
                     } else {
                         // REGEXP, CAMELCASE filtering etc. not supported here
-                        assert (originalKind == NameKind.PREFIX) ||
-                                (originalKind == NameKind.CASE_INSENSITIVE_PREFIX);
+                        assert (originalKind == QuerySupport.Kind.PREFIX) ||
+                                (originalKind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX);
                     }
 
                     IndexedElement element = IndexedElement.create(signature, module, url, clz);
@@ -629,56 +774,50 @@ public class PythonIndex {
 
         return members;
     }
-
-    public Set<IndexedElement> getAllElements(String name, NameKind kind, Set<SearchScope> scope,
-            PythonParserResult context, boolean includeDuplicates) {
-        final Set<SearchResult> result = new HashSet<SearchResult>();
+    
+    public Set<IndexedElement> getAllElements(String name, QuerySupport.Kind kind, PythonParserResult context, boolean includeDuplicates) {
+        final Set<IndexResult> result = new HashSet<IndexResult>();
         // TODO - handle case sensitivity better...
         String field = PythonIndexer.FIELD_ITEM;
-        NameKind originalKind = kind;
-        if (kind == NameKind.EXACT_NAME) {
+        QuerySupport.Kind originalKind = kind;
+        if (kind == QuerySupport.Kind.EXACT) {
             // I can't do exact searches on methods because the method
             // entries include signatures etc. So turn this into a prefix
             // search and then compare chopped off signatures with the name
-            kind = NameKind.PREFIX;
+            kind = QuerySupport.Kind.PREFIX;
         }
 
         String searchUrl = null;
         if (context != null) {
-            try {
-                searchUrl = context.getFile().getFileObject().getURL().toExternalForm();
-            } catch (FileStateInvalidException ex) {
-                Exceptions.printStackTrace(ex);
-            }
+            searchUrl = context.getSnapshot().getSource().getFileObject().toURL().toExternalForm();
         }
 
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_ITEM);
-        terms.add(PythonIndexer.FIELD_MODULE_NAME);
+        String[] terms = { PythonIndexer.FIELD_ITEM,
+                           PythonIndexer.FIELD_MODULE_NAME };
 
-        search(field, name, kind, result, scope, terms);
+        search(field, name, kind, result, terms);
 
         final Set<IndexedElement> elements = new HashSet<IndexedElement>();
         int nameLength = name.length();
 
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
             String[] signatures = map.getValues(PythonIndexer.FIELD_ITEM);
             if (signatures != null && signatures.length > 0) {
-                String url = map.getPersistentUrl();
+                String url = map.getUrl().toExternalForm();
                 String module = map.getValue(PythonIndexer.FIELD_MODULE_NAME);
                 boolean inherited = searchUrl == null || !searchUrl.equals(url);
 
                 for (String signature : signatures) {
-                    if (originalKind == NameKind.EXACT_NAME) {
+                    if (originalKind == QuerySupport.Kind.EXACT) {
                         if (signature.charAt(nameLength) != ';') {
                             continue;
                         }
-                    } else if (originalKind == NameKind.CASE_INSENSITIVE_PREFIX && !signature.regionMatches(true, 0, name, 0, name.length())) {
+                    } else if (originalKind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX && !signature.regionMatches(true, 0, name, 0, name.length())) {
                         continue;
                     } else {
                         // REGEXP, CAMELCASE filtering etc. not supported here
-                        assert (originalKind == NameKind.PREFIX) ||
-                                (originalKind == NameKind.CASE_INSENSITIVE_PREFIX);
+                        assert (originalKind == QuerySupport.Kind.PREFIX) ||
+                                (originalKind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX);
                     }
 
                     IndexedElement element = IndexedElement.create(signature, module, url, null);
@@ -704,20 +843,19 @@ public class PythonIndex {
 
         Set<String> symbols = new HashSet<String>(250);
 
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_MODULE_NAME);
-        terms.add(PythonIndexer.FIELD_ITEM);
+        String[] terms = { PythonIndexer.FIELD_MODULE_NAME,
+                           PythonIndexer.FIELD_ITEM };
 
         // Look up all symbols
         for (String module : modules) {
-            final Set<SearchResult> result = new HashSet<SearchResult>();
+            final Set<IndexResult> result = new HashSet<IndexResult>();
             // TODO - handle case sensitivity better...
             String field = PythonIndexer.FIELD_MODULE_NAME;
-            NameKind kind = NameKind.EXACT_NAME;
+            QuerySupport.Kind kind = QuerySupport.Kind.EXACT;
 
-            search(field, module, kind, result, ALL_SCOPE, terms);
+            search(field, module, kind, result, terms);
 
-            for (SearchResult map : result) {
+            for (IndexResult map : result) {
                 String[] signatures = map.getValues(PythonIndexer.FIELD_ITEM);
                 if (signatures != null) {
                     for (String signature : signatures) {
@@ -798,17 +936,13 @@ public class PythonIndex {
         return symbols;
     }
 
-    public static boolean isBuiltinModule(String module) {
-        return BUILTIN_MODULES.contains(module) || STUB_MISSING.equals(module);
-    }
-
     @SuppressWarnings("unchecked")
     public Set<String> getImportsFor(String ident, boolean includeSymbol) {
         Set<String> modules = new HashSet<String>(10);
 
-        final Set<SearchResult> result = new HashSet<SearchResult>();
-        search(PythonIndexer.FIELD_MODULE_NAME, ident, NameKind.EXACT_NAME, result, ALL_SCOPE, Collections.singleton(PythonIndexer.FIELD_MODULE_NAME));
-        for (SearchResult map : result) {
+        final Set<IndexResult> result = new HashSet<IndexResult>();
+        search(PythonIndexer.FIELD_MODULE_NAME, ident, QuerySupport.Kind.EXACT, result, PythonIndexer.FIELD_MODULE_NAME);
+        for (IndexResult map : result) {
             String module = map.getValue(PythonIndexer.FIELD_MODULE_NAME);
             if (module != null) {
                 // TODO - record more information about this, such as the FQN
@@ -819,18 +953,17 @@ public class PythonIndex {
 
         // TODO - handle case sensitivity better...
         String field = PythonIndexer.FIELD_ITEM;
-        NameKind kind = NameKind.PREFIX; // We're storing encoded signatures so not exact matches
+        QuerySupport.Kind kind = QuerySupport.Kind.PREFIX; // We're storing encoded signatures so not exact matches
 
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_ITEM);
-        terms.add(PythonIndexer.FIELD_MODULE_NAME);
+        String[] terms = { PythonIndexer.FIELD_ITEM,
+                           PythonIndexer.FIELD_MODULE_NAME };
 
         result.clear();
-        search(field, ident, kind, result, ALL_SCOPE, terms);
+        search(field, ident, kind, result, terms);
         String match = ident + ";";
 
         MapSearch:
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
             String module = map.getValue(PythonIndexer.FIELD_MODULE_NAME);
             if (module == null) {
                 continue;
@@ -883,13 +1016,12 @@ public class PythonIndex {
 
         return modules;
     }
-
-    public Set<IndexedElement> getImportedElements(String prefix, NameKind kind, Set<SearchScope> scope,
-            List<Import> imports, List<ImportFrom> importsFrom) {
+    
+    public Set<IndexedElement> getImportedElements(String prefix, QuerySupport.Kind kind, PythonParserResult context, List<Import> imports, List<ImportFrom> importsFrom) {
         // TODO - separate methods from variables?? E.g. if you have method Foo() and class Foo
         // coming from different places
-
-
+        
+        
 //        Set<String> imported = new HashSet<String>();
 //
         Set<IndexedElement> elements = new HashSet<IndexedElement>();
@@ -934,7 +1066,7 @@ public class PythonIndex {
 //        // Create variable items for the locally imported symbols
 //        for (String name : imported) {
 //            if (name.startsWith(prefix)) {
-//                if (kind == NameKind.EXACT_NAME) {
+//                if (kind == QuerySupport.Kind.EXACT) {
 //                    // Ensure that the method is not longer than the prefix
 //                    if ((name.length() > prefix.length()) &&
 //                            (name.charAt(prefix.length()) != '(') &&
@@ -943,8 +1075,8 @@ public class PythonIndex {
 //                    }
 //                } else {
 //                    // REGEXP, CAMELCASE filtering etc. not supported here
-//                    assert (kind == NameKind.PREFIX) ||
-//                    (kind == NameKind.CASE_INSENSITIVE_PREFIX);
+//                    assert (kind == QuerySupport.Kind.PREFIX) ||
+//                    (kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX);
 //                }
 //    String url = null;
 //                ElementKind elementKind = ElementKind.VARIABLE;
@@ -962,18 +1094,16 @@ public class PythonIndex {
         // Always include the current file as imported
         String moduleName = null;
         if (context != null) {
-            moduleName = context.getName();
+            moduleName = PythonUtils.getModuleName(context.getSnapshot().getSource().getFileObject());
             modules.add(moduleName);
         }
 
         modules.addAll(BUILTIN_MODULES);
 
-        addImportedElements(prefix, kind, scope, modules, elements, null);
+        addImportedElements(prefix, kind, modules, elements, null);
 
         return elements;
     }
-    static Map<String, Set<String>> wildcardImports = new HashMap<String, Set<String>>();
-
     public Set<String> getImportedFromWildcards(List<ImportFrom> importsFrom) {
         Set<String> symbols = new HashSet<String>(100);
 
@@ -992,9 +1122,7 @@ public class PythonIndex {
             }
         }
 
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_ITEM);
-        terms.add(PythonIndexer.FIELD_MODULE_NAME);
+        String[] terms = { PythonIndexer.FIELD_ITEM, PythonIndexer.FIELD_MODULE_NAME };
 
         // Look up all symbols
         for (String module : modules) {
@@ -1012,12 +1140,12 @@ public class PythonIndex {
             }
 
 
-            final Set<SearchResult> result = new HashSet<SearchResult>();
+            final Set<IndexResult> result = new HashSet<IndexResult>();
             // TODO - handle case sensitivity better...
 
-            search(PythonIndexer.FIELD_MODULE_NAME, module, NameKind.EXACT_NAME, result, ALL_SCOPE, terms);
+            search(PythonIndexer.FIELD_MODULE_NAME, module, QuerySupport.Kind.EXACT, result, terms);
 
-            for (SearchResult map : result) {
+            for (IndexResult map : result) {
                 String[] items = map.getValues(PythonIndexer.FIELD_ITEM);
                 if (items != null) {
                     for (String signature : items) {
@@ -1044,35 +1172,32 @@ public class PythonIndex {
 
         return symbols;
     }
-
-    public Set<IndexedElement> getImportedElements(String prefix, NameKind kind, Set<SearchScope> scope,
-            Set<String> modules, Set<String> systemModuleHolder) {
+    
+    public Set<IndexedElement> getImportedElements(String prefix, QuerySupport.Kind kind, Set<String> modules, Set<String> systemModuleHolder) {
         Set<IndexedElement> elements = new HashSet<IndexedElement>();
 
-        addImportedElements(prefix, kind, scope, modules, elements, systemModuleHolder);
+        addImportedElements(prefix, kind, modules, elements, systemModuleHolder);
 
         return elements;
     }
-    static Set<String> systemModules;
 
     public boolean isSystemModule(String module) {
         if (systemModules == null) {
             systemModules = new HashSet<String>(800); // measured: 623
-            Set<String> terms = new HashSet<String>(5);
-            terms.add(PythonIndexer.FIELD_MODULE_ATTR_NAME);
-            terms.add(PythonIndexer.FIELD_MODULE_NAME);
-            final Set<SearchResult> result = new HashSet<SearchResult>();
+            String[] terms = { PythonIndexer.FIELD_MODULE_ATTR_NAME,
+                               PythonIndexer.FIELD_MODULE_NAME };
+            final Set<IndexResult> result = new HashSet<IndexResult>();
 
             // This doesn't work because the attrs field isn't searchable:
-            //search(PythonIndexer.FIELD_MODULE_ATTR_NAME, "S", NameKind.PREFIX, result, ALL_SCOPE, terms);
-            //for (SearchResult map : result) {
+            //search(PythonIndexer.FIELD_MODULE_ATTR_NAME, "S", QuerySupport.Kind.PREFIX, result, ALL_SCOPE, terms);
+            //for (IndexResult map : result) {
             //    assert map.getValue(PythonIndexer.FIELD_MODULE_ATTR_NAME).indexOf("S") != -1;
             //    systemModules.add(map.getValue(PythonIndexer.FIELD_MODULE_NAME));
             //}
 
-            search(PythonIndexer.FIELD_MODULE_NAME, "", NameKind.PREFIX, result, ALL_SCOPE, terms);
+            search(PythonIndexer.FIELD_MODULE_NAME, "", QuerySupport.Kind.PREFIX, result, terms);
 
-            for (SearchResult map : result) {
+            for (IndexResult map : result) {
                 String attrs = map.getValue(PythonIndexer.FIELD_MODULE_ATTR_NAME);
                 if (attrs != null && attrs.indexOf('S') != -1) {
                     String mod = map.getValue(PythonIndexer.FIELD_MODULE_NAME);
@@ -1084,19 +1209,14 @@ public class PythonIndex {
         return systemModules.contains(module);
     }
 
-    // TODO - make weak?
-    static Set<String> availableClasses;
-
     public boolean isLowercaseClassName(String clz) {
         if (availableClasses == null) {
             availableClasses = new HashSet<String>(300); // measured: 193
-            Set<String> terms = new HashSet<String>(5);
-            terms.add(PythonIndexer.FIELD_CLASS_NAME);
-            final Set<SearchResult> result = new HashSet<SearchResult>();
+            final Set<IndexResult> result = new HashSet<IndexResult>();
 
-            search(PythonIndexer.FIELD_CLASS_NAME, "", NameKind.PREFIX, result, ALL_SCOPE, terms);
+            search(PythonIndexer.FIELD_CLASS_NAME, "", QuerySupport.Kind.PREFIX, result, PythonIndexer.FIELD_CLASS_NAME);
 
-            for (SearchResult map : result) {
+            for (IndexResult map : result) {
                 String c = map.getValue(PythonIndexer.FIELD_CLASS_NAME);
                 if (c != null && !Character.isUpperCase(c.charAt(0))) {
                     availableClasses.add(c);
@@ -1106,28 +1226,26 @@ public class PythonIndex {
 
         return availableClasses.contains(clz);
     }
-
-    public void addImportedElements(String prefix, NameKind kind, Set<SearchScope> scope,
-            Set<String> modules, Set<IndexedElement> elements, Set<String> systemModuleHolder) {
-
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_ITEM);
-        terms.add(PythonIndexer.FIELD_MODULE_ATTR_NAME);
-        terms.add(PythonIndexer.FIELD_MODULE_NAME);
+    
+    public void addImportedElements(String prefix, QuerySupport.Kind kind, Set<String> modules, Set<IndexedElement> elements, Set<String> systemModuleHolder) {
+        
+        String[] terms = { PythonIndexer.FIELD_ITEM,
+                           PythonIndexer.FIELD_MODULE_ATTR_NAME,
+                           PythonIndexer.FIELD_MODULE_NAME };
 
         // Look up all symbols
         for (String module : modules) {
             boolean isBuiltin = isBuiltinModule(module);
             boolean isSystem = isBuiltin;
 
-            final Set<SearchResult> result = new HashSet<SearchResult>();
+            final Set<IndexResult> result = new HashSet<IndexResult>();
             // TODO - handle case sensitivity better...
 
-            search(PythonIndexer.FIELD_MODULE_NAME, module, NameKind.EXACT_NAME, result, scope, terms);
+            search(PythonIndexer.FIELD_MODULE_NAME, module, QuerySupport.Kind.EXACT, result, terms);
             int prefixLength = prefix.length();
 
-            for (SearchResult map : result) {
-                String url = map.getPersistentUrl();
+            for (IndexResult map : result) {
+                String url = map.getUrl().toExternalForm();
                 String[] items = map.getValues(PythonIndexer.FIELD_ITEM);
                 if (items != null) {
                     String attrs = map.getValue(PythonIndexer.FIELD_MODULE_ATTR_NAME);
@@ -1136,16 +1254,16 @@ public class PythonIndex {
                     }
                     for (String signature : items) {
                         if (signature.startsWith(prefix)) {
-                            if (kind == NameKind.EXACT_NAME) {
+                            if (kind == QuerySupport.Kind.EXACT) {
                                 if (signature.charAt(prefixLength) != ';') {
                                     continue;
                                 }
-                            } else if (kind == NameKind.CASE_INSENSITIVE_PREFIX && !signature.regionMatches(true, 0, prefix, 0, prefix.length())) {
+                            } else if (kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX && !signature.regionMatches(true, 0, prefix, 0, prefix.length())) {
                                 continue;
                             } else {
                                 // REGEXP, CAMELCASE filtering etc. not supported here
-                                assert (kind == NameKind.PREFIX) ||
-                                        (kind == NameKind.CASE_INSENSITIVE_PREFIX);
+                                assert (kind == QuerySupport.Kind.PREFIX) ||
+                                        (kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX);
                             }
 
                             IndexedElement element = IndexedElement.create(signature, module, url, null);
@@ -1170,17 +1288,16 @@ public class PythonIndex {
         }
     }
 
-    public Set<IndexedElement> getExceptions(String prefix, NameKind kind, Set<SearchScope> scope) {
-        final Set<SearchResult> result = new HashSet<SearchResult>();
-        Set<String> terms = new HashSet<String>();
-        terms.add(PythonIndexer.FIELD_EXTENDS_NAME);
-        terms.add(PythonIndexer.FIELD_CLASS_NAME);
-        terms.add(PythonIndexer.FIELD_CLASS_ATTR_NAME);
-        terms.add(PythonIndexer.FIELD_IN);
-        search(PythonIndexer.FIELD_EXTENDS_NAME, "", NameKind.PREFIX, result, scope, terms); // NOI18N
+    public Set<IndexedElement> getExceptions(String prefix, QuerySupport.Kind kind) {
+        final Set<IndexResult> result = new HashSet<IndexResult>();
+        String[] terms = { PythonIndexer.FIELD_EXTENDS_NAME,
+                              PythonIndexer.FIELD_CLASS_NAME,
+                              PythonIndexer.FIELD_CLASS_ATTR_NAME,
+                              PythonIndexer.FIELD_IN };
+        search(PythonIndexer.FIELD_EXTENDS_NAME, "", QuerySupport.Kind.PREFIX, result, terms); // NOI18N
         Map<String, String> extendsMap = new HashMap<String, String>(100);
         // First iteration: Compute inheritance hierarchy
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
 
             String superClass = map.getValue(PythonIndexer.FIELD_EXTENDS_NAME);
             if (superClass != null) {
@@ -1231,21 +1348,21 @@ public class PythonIndex {
 
         // Next add elements for all the exceptions
         final Set<IndexedElement> classes = new HashSet<IndexedElement>();
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
             String clz = map.getValue(PythonIndexer.FIELD_CLASS_NAME);
             if (clz == null || !exceptionClasses.contains(clz)) {
                 continue;
             }
 
-            if ((kind == NameKind.PREFIX) && !clz.startsWith(prefix)) {
+            if ((kind == QuerySupport.Kind.PREFIX) && !clz.startsWith(prefix)) {
                 continue;
-            } else if (kind == NameKind.CASE_INSENSITIVE_PREFIX && !clz.regionMatches(true, 0, prefix, 0, prefix.length())) {
+            } else if (kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX && !clz.regionMatches(true, 0, prefix, 0, prefix.length())) {
                 continue;
-            } else if (kind == NameKind.EXACT_NAME && !clz.equals(prefix)) {
+            } else if (kind == QuerySupport.Kind.EXACT && !clz.equals(prefix)) {
                 continue;
             }
 
-            String url = map.getPersistentUrl();
+            String url = map.getUrl().toExternalForm();
             String module = map.getValue(PythonIndexer.FIELD_IN);
             IndexedElement element = new IndexedElement(clz, ElementKind.CLASS, url, module, null, null);
             String attrs = map.getValue(PythonIndexer.FIELD_CLASS_ATTR_NAME);
@@ -1299,9 +1416,8 @@ public class PythonIndex {
 
         return classes;
     }
-
-    private boolean addSubclasses(String classFqn,
-            Set<IndexedElement> classes, Set<String> seenClasses, Set<String> scannedClasses, boolean directOnly) {
+    
+    private boolean addSubclasses(String classFqn, Set<IndexedElement> classes, Set<String> seenClasses, Set<String> scannedClasses, boolean directOnly) {
         // Prevent problems with circular includes or redundant includes
         if (scannedClasses.contains(classFqn)) {
             return false;
@@ -1311,15 +1427,14 @@ public class PythonIndex {
 
         String searchField = PythonIndexer.FIELD_EXTENDS_NAME;
 
-        Set<SearchResult> result = new HashSet<SearchResult>();
+        Set<IndexResult> result = new HashSet<IndexResult>();
 
-        Set<String> terms = new HashSet<String>(5);
-        terms.add(PythonIndexer.FIELD_IN);
-        terms.add(PythonIndexer.FIELD_EXTENDS_NAME);
-        terms.add(PythonIndexer.FIELD_CLASS_ATTR_NAME);
-        terms.add(PythonIndexer.FIELD_CLASS_NAME);
+        String[] terms = { PythonIndexer.FIELD_IN,
+                              PythonIndexer.FIELD_EXTENDS_NAME,
+                              PythonIndexer.FIELD_CLASS_ATTR_NAME,
+                              PythonIndexer.FIELD_CLASS_NAME };
 
-        search(searchField, classFqn, NameKind.EXACT_NAME, result, ALL_SCOPE, terms);
+        search(searchField, classFqn, QuerySupport.Kind.EXACT, result, terms);
 
         boolean foundIt = result.size() > 0;
 
@@ -1328,10 +1443,10 @@ public class PythonIndex {
             return foundIt;
         }
 
-        for (SearchResult map : result) {
+        for (IndexResult map : result) {
             String className = map.getValue(PythonIndexer.FIELD_CLASS_NAME);
             if (className != null && !seenClasses.contains(className)) {
-                String url = map.getPersistentUrl();
+                String url = map.getUrl().toExternalForm();
                 String module = map.getValue(PythonIndexer.FIELD_IN);
                 IndexedElement clz = new IndexedElement(className, ElementKind.CLASS, url, module, null, null);
                 String attrs = map.getValue(PythonIndexer.FIELD_CLASS_ATTR_NAME);
@@ -1350,124 +1465,5 @@ public class PythonIndex {
         }
 
         return foundIt;
-    }
-    private static String clusterUrl = null;
-
-    // For testing only
-    public static void setClusterUrl(String url) {
-        clusterUrl = url;
-    }
-
-    static String getPreindexUrl(String url) {
-        // TODO - look up the correct platform to use!
-        final PythonPlatformManager manager = PythonPlatformManager.getInstance();
-        final String platformName = manager.getDefaultPlatform();
-        PythonPlatform platform = manager.getPlatform(platformName);
-        if (platform != null) {
-            String s = platform.getHomeUrl();
-            if (s != null) {
-                if (url.startsWith(s)) {
-                    url = PYTHONHOME_URL + url.substring(s.length());
-                    return url;
-                }
-            }
-        }
-
-        String s = getClusterUrl();
-
-        if (url.startsWith(s)) {
-            return CLUSTER_URL + url.substring(s.length());
-        }
-
-        if (url.startsWith("jar:file:")) { // NOI18N
-           String sub = url.substring(4);
-            if (sub.startsWith(s)) {
-                return CLUSTER_URL + sub.substring(s.length());
-            }
-        }
-
-        return url;
-    }
-
-    /** Get the FileObject corresponding to a URL returned from the index */
-    public static FileObject getFileObject(String url) {
-        return getFileObject(url, null);
-    }
-
-    public static FileObject getFileObject(String url, FileObject context) {
-        try {
-            if (url.startsWith(PYTHONHOME_URL)) {
-                Iterator<String> it = null;
-
-                // TODO - look up the right platform for the given project
-                //if (context != null) {
-                //    Project project = FileOwnerQuery.getOwner(context);
-                //    if (project != null) {
-                //        PythonPlatform platform = PythonPlatform.platformFor(project);
-                //        if (platform != null) {
-                //            it = Collections.singleton(platform).iterator();
-                //        }
-                //    }
-                //}
-
-                PythonPlatformManager manager = PythonPlatformManager.getInstance();
-                if (it == null) {
-                    it = manager.getPlatformList().iterator();
-                }
-                while (it.hasNext()) {
-                    String name = it.next();
-                    PythonPlatform platform = manager.getPlatform(name);
-                    if (platform != null) {
-                        String u = platform.getHomeUrl();
-                        if (u != null) {
-                            try {
-                                u = u + url.substring(PYTHONHOME_URL.length());
-                                FileObject fo = URLMapper.findFileObject(new URL(u));
-                                if (fo != null) {
-                                    return fo;
-                                }
-                            } catch (MalformedURLException mue) {
-                                Exceptions.printStackTrace(mue);
-                            }
-                        }
-                    }
-                }
-
-                return null;
-            } else if (url.startsWith(CLUSTER_URL)) {
-                url = getClusterUrl() + url.substring(CLUSTER_URL.length()); // NOI18N
-                if (url.indexOf(".egg!/") != -1) { // NOI18N
-                    url = "jar:" + url; // NOI18N
-                }
-            }
-
-            return URLMapper.findFileObject(new URL(url));
-        } catch (IOException ex) {
-            Exceptions.printStackTrace(ex);
-        }
-
-        return null;
-    }
-
-    static String getClusterUrl() {
-        if (clusterUrl == null) {
-            File f =
-                    InstalledFileLocator.getDefault().locate("modules/org-netbeans-modules-python-editor.jar", null, false); // NOI18N
-
-            if (f == null) {
-                throw new RuntimeException("Can't find cluster");
-            }
-
-            f = new File(f.getParentFile().getParentFile().getAbsolutePath());
-
-            try {
-                f = f.getCanonicalFile();
-                clusterUrl = f.toURI().toURL().toExternalForm();
-            } catch (IOException ioe) {
-                Exceptions.printStackTrace(ioe);
-            }
-        }
-
-        return clusterUrl;
     }
 }

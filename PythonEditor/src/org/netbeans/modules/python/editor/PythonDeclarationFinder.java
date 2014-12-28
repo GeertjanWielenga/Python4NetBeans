@@ -38,8 +38,6 @@ import java.util.List;
 import java.util.Set;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
-import org.netbeans.modules.gsf.api.Index;
-import org.netbeans.modules.gsf.api.SourceModelFactory;
 import org.netbeans.modules.python.editor.elements.IndexedElement;
 import org.netbeans.modules.python.editor.elements.IndexedMethod;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
@@ -51,12 +49,14 @@ import org.netbeans.api.lexer.TokenId;
 import org.netbeans.api.lexer.TokenSequence;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.DeclarationFinder;
-import org.netbeans.modules.gsf.api.ElementHandle;
-import org.netbeans.modules.gsf.api.HtmlFormatter;
-import org.netbeans.modules.gsf.api.NameKind;
-import org.netbeans.modules.gsf.api.OffsetRange;
+import org.netbeans.modules.csl.api.DeclarationFinder;
+import org.netbeans.modules.csl.api.DeclarationFinder.AlternativeLocation;
+import org.netbeans.modules.csl.api.DeclarationFinder.DeclarationLocation;
+import org.netbeans.modules.csl.api.ElementHandle;
+import org.netbeans.modules.csl.api.HtmlFormatter;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.parsing.spi.indexing.support.QuerySupport;
 import org.netbeans.modules.python.editor.lexer.PythonLexer;
 import org.netbeans.modules.python.editor.scopes.SymbolTable;
 import org.netbeans.modules.python.editor.scopes.SymInfo;
@@ -157,7 +157,7 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         return OffsetRange.NONE;
     }
 
-    private DeclarationLocation findImport(CompilationInfo info, int lexOffset, BaseDocument doc) {
+    private DeclarationLocation findImport(PythonParserResult info, int lexOffset, BaseDocument doc) {
         TokenSequence<? extends PythonTokenId> ts = PythonLexerUtils.getPositionedSequence(doc, lexOffset);
         if (ts == null) {
             return DeclarationLocation.NONE;
@@ -253,21 +253,21 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         return DeclarationLocation.NONE;
     }
 
-    private DeclarationLocation findImport(CompilationInfo info, String moduleName, String symbol) {
-        PythonIndex index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE));
+    private DeclarationLocation findImport(PythonParserResult info, String moduleName, String symbol) {
+        PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
 
         Set<IndexedElement> elements = null;
 
         if (moduleName != null && symbol != null) {
-            elements = index.getImportedElements(symbol, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, Collections.<String>singleton(moduleName), null);
+            elements = index.getImportedElements(symbol, QuerySupport.Kind.EXACT, Collections.<String>singleton(moduleName), null);
         }
 
         if (symbol != null && (elements == null || elements.size() == 0)) {
-            elements = index.getInheritedElements(null, symbol, NameKind.EXACT_NAME);
+            elements = index.getInheritedElements(null, symbol, QuerySupport.Kind.EXACT);
         }
 
         if (elements == null || elements.size() == 0) {
-            elements = index.getModules(moduleName, NameKind.EXACT_NAME);
+            elements = index.getModules(moduleName, QuerySupport.Kind.EXACT);
         }
 
         if (elements != null && elements.size() > 0) {
@@ -316,7 +316,7 @@ public class PythonDeclarationFinder implements DeclarationFinder {
     }
 
     @SuppressWarnings("empty-statement")
-    private DeclarationLocation findUrl(CompilationInfo info, Document doc, int lexOffset) {
+    private DeclarationLocation findUrl(PythonParserResult info, Document doc, int lexOffset) {
         TokenSequence<?> ts = PythonLexerUtils.getPythonSequence((BaseDocument)doc, lexOffset);
 
         if (ts == null) {
@@ -367,9 +367,10 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         return DeclarationLocation.NONE;
     }
 
-    public DeclarationLocation findDeclaration(CompilationInfo info, int lexOffset) {
+    @Override
+    public DeclarationLocation findDeclaration(ParserResult info, int lexOffset) {
 
-        final Document document = info.getDocument();
+        final Document document = info.getSnapshot().getSource().getDocument(false);
         if (document == null) {
             return DeclarationLocation.NONE;
         }
@@ -393,12 +394,12 @@ public class PythonDeclarationFinder implements DeclarationFinder {
             }
 
             // See if it's an import
-            DeclarationLocation imp = findImport(info, lexOffset, doc);
+            DeclarationLocation imp = findImport(parseResult, lexOffset, doc);
             if (imp != DeclarationLocation.NONE) {
                 return imp;
             }
 
-            DeclarationLocation url = findUrl(info, doc, lexOffset);
+            DeclarationLocation url = findUrl(parseResult, doc, lexOffset);
             if (url != DeclarationLocation.NONE) {
                 return url;
             }
@@ -406,6 +407,8 @@ public class PythonDeclarationFinder implements DeclarationFinder {
             final TokenHierarchy<Document> th = TokenHierarchy.get(document);
             org.netbeans.modules.python.editor.lexer.Call call =
                     org.netbeans.modules.python.editor.lexer.Call.getCallType(doc, th, lexOffset);
+            
+            FileObject fileObject = info.getSnapshot().getSource().getFileObject();
 
             // Search for local variables
             if (root != null && call.getLhs() == null) {
@@ -418,13 +421,13 @@ public class PythonDeclarationFinder implements DeclarationFinder {
                     SymInfo sym = symbolTable.findDeclaration(scope, name, true);
                     if (sym != null) {
                         if (sym.isFree()) {
-                            PythonIndex index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE));
+                            PythonIndex index = PythonIndex.get(fileObject);
 
                             List<Import> imports = symbolTable.getImports();
                             List<ImportFrom> importsFrom = symbolTable.getImportsFrom();
-                            Set<IndexedElement> elements = index.getImportedElements(name, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, imports, importsFrom);
+                            Set<IndexedElement> elements = index.getImportedElements(name, QuerySupport.Kind.EXACT, parseResult, imports, importsFrom);
                             if (elements != null && elements.size() > 0) {
-                                return getDeclaration(info, null /*name*/, elements,
+                                return getDeclaration(parseResult, null /*name*/, elements,
                                         path, node, index, astOffset, lexOffset);
                             }
                         // Must be defined by one of the imported symbols
@@ -443,7 +446,7 @@ public class PythonDeclarationFinder implements DeclarationFinder {
                                                 break;
                                             } else if (at.getInternalName().equals(name)) {
                                                 // We found our library - just show it
-                                                return findImport(info, name, null);
+                                                return findImport(parseResult, name, null);
                                             }
                                         }
                                     }
@@ -457,7 +460,7 @@ public class PythonDeclarationFinder implements DeclarationFinder {
                                                 break;
                                             } else if (at.getInternalName().equals(name)) {
                                                 // We found our library - just show it
-                                                return findImport(info, impNode.getInternalModule(), name);
+                                                return findImport(parseResult, impNode.getInternalModule(), name);
                                             }
                                         }
                                     }
@@ -465,22 +468,22 @@ public class PythonDeclarationFinder implements DeclarationFinder {
                             }
 
                             if (sym.isUnresolved()) {
-                                PythonIndex index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE));
+                                PythonIndex index = PythonIndex.get(fileObject);
 
                                 List<Import> imports = symbolTable.getImports();
                                 List<ImportFrom> importsFrom = symbolTable.getImportsFrom();
-                                Set<IndexedElement> elements = index.getImportedElements(name, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, imports, importsFrom);
+                                Set<IndexedElement> elements = index.getImportedElements(name, QuerySupport.Kind.EXACT, parseResult, imports, importsFrom);
                                 if (elements != null && elements.size() > 0) {
-                                    return getDeclaration(info, null /*name*/, elements,
+                                    return getDeclaration(parseResult, null /*name*/, elements,
                                             path, node, index, astOffset, lexOffset);
                                 }
                             } else {
                                 OffsetRange astRange = PythonAstUtils.getNameRange(null, declNode);
-                                int lexerOffset = PythonLexerUtils.getLexerOffset(info, astRange.getStart());
+                                int lexerOffset = PythonLexerUtils.getLexerOffset(parseResult, astRange.getStart());
                                 if (lexerOffset == -1) {
                                     lexerOffset = 0;
                                 }
-                                return new DeclarationLocation(info.getFileObject(), lexerOffset);
+                                return new DeclarationLocation(fileObject, lexerOffset);
                             }
                         }
                     }
@@ -510,11 +513,11 @@ public class PythonDeclarationFinder implements DeclarationFinder {
                 }
 
                 if (name != null) {
-                    PythonIndex index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE));
+                    PythonIndex index = PythonIndex.get(fileObject);
                     // Add methods in the class (without an FQN)
-                    Set<IndexedElement> elements = index.getInheritedElements(type, name, NameKind.EXACT_NAME);
+                    Set<IndexedElement> elements = index.getInheritedElements(type, name, QuerySupport.Kind.EXACT);
                     if (elements != null && elements.size() > 0) {
-                        return getDeclaration(info, null /*name*/, elements,
+                        return getDeclaration(parseResult, null /*name*/, elements,
                                 path, node, index, astOffset, lexOffset);
                     }
                 }
@@ -530,32 +533,32 @@ public class PythonDeclarationFinder implements DeclarationFinder {
                 }
             }
             if (prefix != null) {
-                PythonIndex index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE));
+                PythonIndex index = PythonIndex.get(fileObject);
 
                 Set<? extends IndexedElement> elements = null;
                 if (prefix.length() > 0 && Character.isUpperCase(prefix.charAt(0))) {
-                    elements = index.getClasses(prefix, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, parseResult, true);
+                    elements = index.getClasses(prefix, QuerySupport.Kind.EXACT, parseResult, true);
                 }
 
                 if (elements == null || elements.size() == 0) {
                     elements = index.getAllElements(prefix,
-                            NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, parseResult, true);
+                            QuerySupport.Kind.EXACT, parseResult, true);
                 }
 
                 if (elements == null || elements.size() == 0) {
                     elements = index.getAllMembers(prefix,
-                            NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, parseResult, true);
+                            QuerySupport.Kind.EXACT, parseResult, true);
                 }
 
                 if (elements != null && elements.size() > 0) {
-                    return getDeclaration(info, null /*name*/, elements,
+                    return getDeclaration(parseResult, null /*name*/, elements,
                             path, node, index, astOffset, lexOffset);
                 }
 
             // TODO - classes
 //WORKING HERE                
 //                if (elements == null || elements.size() == 0) {
-//                    elements = index.getClasses(prefix, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, parseResult, true);
+//                    elements = index.getClasses(prefix, QuerySupport.Kind.EXACT, PythonIndex.ALL_SCOPE, parseResult, true);
 //                }
 //                if (elements != null && elements.size() > 0) {
 //                    String name = null; // unused!
@@ -570,9 +573,9 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         return DeclarationLocation.NONE;
     }
 
-    private DeclarationLocation getDeclaration(CompilationInfo info, String name, Set<? extends IndexedElement> methods,
+    private DeclarationLocation getDeclaration(PythonParserResult info, String name, Set<? extends IndexedElement> methods,
             AstPath path, PythonTree closest, PythonIndex index, int astOffset, int lexOffset) {
-        BaseDocument doc = (BaseDocument)info.getDocument();
+        BaseDocument doc = (BaseDocument)info.getSnapshot().getSource().getDocument(false);
         if (doc == null) {
             return DeclarationLocation.NONE;
         }
@@ -584,8 +587,8 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         return getDeclarationLocation(info, candidate, methods);
     }
 
-    private DeclarationLocation getDeclarationLocation(CompilationInfo info, IndexedElement candidate, Set<? extends IndexedElement> methods) {
-        BaseDocument doc = (BaseDocument)info.getDocument();
+    private DeclarationLocation getDeclarationLocation(PythonParserResult info, IndexedElement candidate, Set<? extends IndexedElement> methods) {
+        BaseDocument doc = (BaseDocument)info.getSnapshot().getSource().getDocument(false);
         if (doc == null) {
             return DeclarationLocation.NONE;
         }
@@ -632,7 +635,7 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         return DeclarationLocation.NONE;
     }
 
-    private IndexedElement findBestMatch(CompilationInfo info, String name, Set<? extends IndexedElement> methodSet,
+    private IndexedElement findBestMatch(PythonParserResult info, String name, Set<? extends IndexedElement> methodSet,
             BaseDocument doc, int astOffset, int lexOffset, AstPath path, PythonTree call, PythonIndex index) {
         // Make sure that the best fit method actually has a corresponding valid source location
         // and parse tree
@@ -665,7 +668,7 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         return null;
     }
 
-    private IndexedElement findBestMatchHelper(CompilationInfo info, String name, Set<IndexedElement> elements,
+    private IndexedElement findBestMatchHelper(PythonParserResult info, String name, Set<IndexedElement> elements,
             BaseDocument doc, int astOffset, int lexOffset, AstPath path, PythonTree callNode, PythonIndex index) {
 
         Set<IndexedElement> candidates = new HashSet<IndexedElement>();
@@ -677,25 +680,21 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         }
 
         // 1. Prefer matches in the current file
-        try {
-            String searchUrl = info.getFileObject().getURL().toExternalForm();
-            candidates = new HashSet<IndexedElement>();
+        String searchUrl = info.getSnapshot().getSource().getFileObject().toURL().toExternalForm();
+        candidates = new HashSet<IndexedElement>();
 
-            for (IndexedElement element : elements) {
-                String url = element.getFilenameUrl();
+        for (IndexedElement element : elements) {
+            String url = element.getFilenameUrl();
 
-                if (url.equals(searchUrl)) {
-                    candidates.add(element);
-                }
+            if (url.equals(searchUrl)) {
+                candidates.add(element);
             }
+        }
 
-            if (candidates.size() == 1) {
-                return candidates.iterator().next();
-            } else if (!candidates.isEmpty()) {
-                elements = candidates;
-            }
-        } catch (FileStateInvalidException ex) {
-            Exceptions.printStackTrace(ex);
+        if (candidates.size() == 1) {
+            return candidates.iterator().next();
+        } else if (!candidates.isEmpty()) {
+            elements = candidates;
         }
 
 
@@ -772,7 +771,7 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         return elements.iterator().next();
     }
 
-    public DeclarationLocation getSuperImplementations(CompilationInfo info, int lexOffset) {
+    public DeclarationLocation getSuperImplementations(PythonParserResult info, int lexOffset) {
         // Figure out if we're on a method, and if so, locate the nearest
         // method it is overriding.
         // Otherwise, if we're on a class (anywhere, not just definition),
@@ -799,7 +798,7 @@ public class PythonDeclarationFinder implements DeclarationFinder {
                 }
 
                 Set<IndexedElement> elements = null;
-                PythonIndex index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE));
+                PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
                 if (findClass) {
                     elements = index.getSuperClasses(name);
                 } else {
@@ -828,9 +827,9 @@ public class PythonDeclarationFinder implements DeclarationFinder {
         return DeclarationLocation.NONE;
     }
 
-    public IndexedMethod findMethodDeclaration(CompilationInfo info, org.python.antlr.ast.Call call, AstPath path, Set<IndexedMethod>[] alternativesHolder) {
+    public IndexedMethod findMethodDeclaration(PythonParserResult info, org.python.antlr.ast.Call call, AstPath path, Set<IndexedMethod>[] alternativesHolder) {
         PythonParserResult parseResult = PythonAstUtils.getParseResult(info);
-        PythonIndex index = PythonIndex.get(info.getIndex(PythonTokenId.PYTHON_MIME_TYPE));
+        PythonIndex index = PythonIndex.get(info.getSnapshot().getSource().getFileObject());
         Set<IndexedElement> functions = null;
 
         // TODO - do more accurate lookup of types here!
@@ -844,9 +843,9 @@ public class PythonDeclarationFinder implements DeclarationFinder {
 
         if (call.getInternalFunc() instanceof Attribute) {
             // Method/member access
-            functions = index.getAllMembers(callName, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, parseResult, false);
+            functions = index.getAllMembers(callName, QuerySupport.Kind.EXACT, parseResult, false);
         } else {
-            functions = index.getAllElements(callName, NameKind.EXACT_NAME, PythonIndex.ALL_SCOPE, parseResult, false);
+            functions = index.getAllElements(callName, QuerySupport.Kind.EXACT, parseResult, false);
         }
 
         if (functions != null && functions.size() > 0) {
@@ -860,7 +859,7 @@ public class PythonDeclarationFinder implements DeclarationFinder {
             int astOffset = call.getCharStartIndex();
             int lexOffset = PythonLexerUtils.getLexerOffset(info, astOffset);
             IndexedElement candidate =
-                    findBestMatch(info, callName, eligible, (BaseDocument)info.getDocument(),
+                    findBestMatch(info, callName, eligible, (BaseDocument)info.getSnapshot().getSource().getDocument(false),
                     astOffset, lexOffset, path, call, index);
             assert candidate instanceof IndexedMethod; // Filtered into earlier already
             return (IndexedMethod)candidate;
@@ -882,16 +881,11 @@ public class PythonDeclarationFinder implements DeclarationFinder {
             return DeclarationLocation.NONE;
         }
 
-        Index gsfIndex = SourceModelFactory.getInstance().getIndex(fileInProject, PythonTokenId.PYTHON_MIME_TYPE);
-        if (gsfIndex == null) {
-            return DeclarationLocation.NONE;
-        }
-
         String className = testString.substring(0, methodIndex);
         String methodName = testString.substring(methodIndex+1);
 
-        PythonIndex index = PythonIndex.get(gsfIndex, fileInProject);
-        Set<IndexedElement> elements = index.getAllMembers(methodName, NameKind.EXACT_NAME, PythonIndex.SOURCE_SCOPE, null, true);
+        PythonIndex index = PythonIndex.get(fileInProject);
+        Set<IndexedElement> elements = index.getAllMembers(methodName, QuerySupport.Kind.EXACT, null, true);
         // Look for one that matches our class name
         if (elements.size() > 0) {
             IndexedElement candidate = null;

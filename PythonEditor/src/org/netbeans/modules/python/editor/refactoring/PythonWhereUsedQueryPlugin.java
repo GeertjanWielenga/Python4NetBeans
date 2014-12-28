@@ -42,7 +42,7 @@
  * made subject to such option by the copyright holder.
  */
 package org.netbeans.modules.python.editor.refactoring;
-
+/*
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
@@ -90,7 +90,7 @@ import org.python.antlr.ast.ClassDef;
 import org.python.antlr.ast.FunctionDef;
 import org.python.antlr.ast.Name;
 import org.python.antlr.base.expr;
-
+*/
 /**
  * Actual implementation of Find Usages query search for Python
  * 
@@ -99,13 +99,13 @@ import org.python.antlr.base.expr;
  * 
  * @author Tor Norbye
  */
+/* Uncomment when it works ;-)
 public class PythonWhereUsedQueryPlugin extends PythonRefactoringPlugin {
     private WhereUsedQuery refactoring;
     private PythonElementCtx searchHandle;
     private Set<IndexedElement> subclasses;
     private String targetName;
 
-    /** Creates a new instance of WhereUsedQuery */
     public PythonWhereUsedQueryPlugin(WhereUsedQuery refactoring) {
         this.refactoring = refactoring;
         this.searchHandle = refactoring.getRefactoringSource().lookup(PythonElementCtx.class);
@@ -461,7 +461,7 @@ public class PythonWhereUsedQueryPlugin extends PythonRefactoringPlugin {
      *   - I've gotta filter fields, methods etc. that are not in the current class
      *  (but I also have to search for methods that are OVERRIDING the class... so I've gotta work a little harder!)
      * @todo Arity matching on the methods to preclude methods that aren't overriding or aliasing!
-     */
+     *
     private class FindUsagesMethodVisitor extends Visitor {
         private String name;
         private PythonElementCtx searchCtx;
@@ -541,3 +541,4 @@ public class PythonWhereUsedQueryPlugin extends PythonRefactoringPlugin {
         }
     }
 }
+*/

@@ -10,16 +10,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.ParserResult;
-import org.netbeans.modules.gsf.api.TranslatedSource;
 import org.netbeans.api.lexer.Token;
 import org.netbeans.api.lexer.TokenHierarchy;
 import org.netbeans.api.lexer.TokenId;
 import org.netbeans.api.lexer.TokenSequence;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.openide.filesystems.FileUtil;
 import org.openide.loaders.DataObject;
 import org.openide.util.Exceptions;
@@ -71,33 +69,21 @@ public class PythonLexerUtils {
     }
 
     /** For a possibly generated offset in an AST, return the corresponding lexing/true document offset */
-    public static int getLexerOffset(CompilationInfo info, int astOffset) {
-        ParserResult result = info.getEmbeddedResult(PythonTokenId.PYTHON_MIME_TYPE, 0);
-        if (result != null) {
-            TranslatedSource ts = result.getTranslatedSource();
-            if (ts != null) {
-                return ts.getLexicalOffset(astOffset);
-            }
-        }
-
-        return astOffset;
+    public static int getLexerOffset(PythonParserResult result, int astOffset) {
+        return result.getSnapshot().getOriginalOffset(astOffset);
     }
 
-    public static OffsetRange getLexerOffsets(CompilationInfo info, OffsetRange astRange) {
-        ParserResult result = info.getEmbeddedResult(PythonTokenId.PYTHON_MIME_TYPE, 0);
+    public static OffsetRange getLexerOffsets(PythonParserResult result, OffsetRange astRange) {
         if (result != null) {
-            TranslatedSource ts = result.getTranslatedSource();
-            if (ts != null) {
-                int rangeStart = astRange.getStart();
-                int start = ts.getLexicalOffset(rangeStart);
-                if (start == rangeStart) {
-                    return astRange;
-                } else if (start == -1) {
-                    return OffsetRange.NONE;
-                } else {
-                    // Assumes the translated range maintains size
-                    return new OffsetRange(start, start + astRange.getLength());
-                }
+            int rangeStart = astRange.getStart();
+            int start = result.getSnapshot().getOriginalOffset(rangeStart);
+            if (start == rangeStart) {
+                return astRange;
+            } else if (start == -1) {
+                return OffsetRange.NONE;
+            } else {
+                // Assumes the translated range maintains size
+                return new OffsetRange(start, start + astRange.getLength());
             }
         }
 

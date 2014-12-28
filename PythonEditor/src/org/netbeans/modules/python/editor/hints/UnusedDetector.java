@@ -48,12 +48,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.prefs.Preferences;
 import javax.swing.JComponent;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.RuleContext;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.RuleContext;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
@@ -93,9 +92,8 @@ public class UnusedDetector extends PythonAstRule {
     }
 
     public void run(PythonRuleContext context, List<Hint> result) {
-        CompilationInfo info = context.compilationInfo;
-        PythonParserResult pr = PythonAstUtils.getParseResult(info);
-        SymbolTable symbolTable = pr.getSymbolTable();
+        PythonParserResult info = (PythonParserResult) context.parserResult;
+        SymbolTable symbolTable = info.getSymbolTable();
 
         boolean skipParams = true;
         Preferences pref = context.manager.getPreferences(this);
@@ -138,7 +136,7 @@ public class UnusedDetector extends PythonAstRule {
             if (range != OffsetRange.NONE) {
                 List<HintFix> fixList = new ArrayList<HintFix>(3);
                 String message = NbBundle.getMessage(NameRule.class, "UnusedVariable", name);
-                Hint desc = new Hint(this, message, info.getFileObject(), range, fixList, 2305);
+                Hint desc = new Hint(this, message, info.getSnapshot().getSource().getFileObject(), range, fixList, 2305);
                 result.add(desc);
             }
         }

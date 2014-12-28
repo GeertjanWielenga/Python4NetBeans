@@ -31,24 +31,24 @@
 package org.netbeans.modules.python.editor;
 
 import java.io.File;
-import java.util.Collection;
-import java.util.Collections;
 import org.netbeans.modules.python.editor.hints.PythonHintsProvider;
 import org.netbeans.api.lexer.Language;
+import org.netbeans.modules.csl.api.CodeCompletionHandler;
+import org.netbeans.modules.csl.api.DeclarationFinder;
+import org.netbeans.modules.csl.api.Formatter;
+import org.netbeans.modules.csl.api.HintsProvider;
+import org.netbeans.modules.csl.api.IndexSearcher;
+import org.netbeans.modules.csl.api.InstantRenamer;
+import org.netbeans.modules.csl.api.KeystrokeHandler;
+import org.netbeans.modules.csl.api.OccurrencesFinder;
+import org.netbeans.modules.csl.api.SemanticAnalyzer;
+import org.netbeans.modules.csl.api.StructureScanner;
+import org.netbeans.modules.csl.spi.DefaultLanguageConfig;
+import org.netbeans.modules.csl.spi.LanguageRegistration;
+import org.netbeans.modules.parsing.spi.Parser;
+import org.netbeans.modules.parsing.spi.indexing.EmbeddingIndexerFactory;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
-import org.netbeans.modules.gsf.api.CodeCompletionHandler;
-import org.netbeans.modules.gsf.api.DeclarationFinder;
-import org.netbeans.modules.gsf.api.Formatter;
-import org.netbeans.modules.gsf.api.HintsProvider;
-import org.netbeans.modules.gsf.api.IndexSearcher;
-import org.netbeans.modules.gsf.api.Indexer;
-import org.netbeans.modules.gsf.api.InstantRenamer;
-import org.netbeans.modules.gsf.api.KeystrokeHandler;
-import org.netbeans.modules.gsf.api.OccurrencesFinder;
-import org.netbeans.modules.gsf.api.Parser;
-import org.netbeans.modules.gsf.api.SemanticAnalyzer;
-import org.netbeans.modules.gsf.api.StructureScanner;
-import org.netbeans.modules.gsf.spi.DefaultLanguageConfig;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.modules.InstalledFileLocator;
@@ -58,6 +58,7 @@ import org.openide.modules.InstalledFileLocator;
  * @author alley
  * @author Tor Norbye
  */
+@LanguageRegistration(mimeType=PythonMIMEResolver.PYTHON_MIME_TYPE)
 public class PythonLanguage extends DefaultLanguageConfig {
     private static FileObject jsStubsFO;
 
@@ -74,10 +75,12 @@ public class PythonLanguage extends DefaultLanguageConfig {
                 c == '_';
     }
 
+    @Override
     public Language getLexerLanguage() {
         return PythonTokenId.language();
     }
 
+    @Override
     public String getDisplayName() {
         return "Python";
     }
@@ -107,7 +110,7 @@ public class PythonLanguage extends DefaultLanguageConfig {
     public SemanticAnalyzer getSemanticAnalyzer() {
         return new PythonSemanticHighlighter();
     }
-
+    
     @Override
     public KeystrokeHandler getKeystrokeHandler() {
         return new PythonKeystrokeHandler();
@@ -134,8 +137,8 @@ public class PythonLanguage extends DefaultLanguageConfig {
     }
 
     @Override
-    public Indexer getIndexer() {
-        return new PythonIndexer();
+    public EmbeddingIndexerFactory getIndexerFactory() {
+        return new PythonIndexerFactory();
     }
 
     @Override
@@ -167,12 +170,6 @@ public class PythonLanguage extends DefaultLanguageConfig {
     public Formatter getFormatter() {
         return new PythonFormatter();
     }
-
-    @Override
-    public Collection<FileObject> getCoreLibraries() {
-        return Collections.singletonList(getPythonStubs());
-    }
-
 
     // TODO - add classpath recognizer for these ? No, don't need go to declaration inside these files...
     public static FileObject getPythonStubs() {

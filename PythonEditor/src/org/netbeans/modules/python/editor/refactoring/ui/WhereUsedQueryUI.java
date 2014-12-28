@@ -46,8 +46,7 @@ package org.netbeans.modules.python.editor.refactoring.ui;
 import java.text.MessageFormat;
 import java.util.ResourceBundle;
 import javax.swing.event.ChangeListener;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.napi.gsfret.source.CompilationInfo;
+import org.netbeans.modules.csl.api.ElementKind;
 import org.netbeans.modules.refactoring.api.AbstractRefactoring;
 import org.netbeans.modules.refactoring.api.WhereUsedQuery;
 import org.netbeans.modules.python.editor.refactoring.PythonRefUtils;
@@ -55,7 +54,6 @@ import org.netbeans.modules.python.editor.refactoring.PythonElementCtx;
 import org.netbeans.modules.python.editor.refactoring.WhereUsedQueryConstants;
 import org.netbeans.modules.refactoring.spi.ui.CustomRefactoringPanel;
 import org.netbeans.modules.refactoring.spi.ui.RefactoringUI;
-import org.netbeans.napi.gsfret.source.ClasspathInfo;
 import org.openide.util.HelpCtx;
 import org.openide.util.NbBundle;
 import org.openide.util.lookup.Lookups;
@@ -73,12 +71,12 @@ public class WhereUsedQueryUI implements RefactoringUI {
     private ElementKind kind;
     private AbstractRefactoring delegate;
 
-    public WhereUsedQueryUI(PythonElementCtx jmiObject, CompilationInfo info) {
+    public WhereUsedQueryUI(PythonElementCtx jmiObject) {
         this.query = new WhereUsedQuery(Lookups.singleton(jmiObject));
-        ClasspathInfo classpathInfoFor = PythonRefUtils.getClasspathInfoFor(jmiObject);
-        if (classpathInfoFor != null) {
-            this.query.getContext().add(classpathInfoFor);
-        }
+//        ClasspathInfo classpathInfoFor = PythonRefUtils.getClasspathInfoFor(jmiObject);
+//        if (classpathInfoFor != null) {
+//            this.query.getContext().add(classpathInfoFor);
+//        }
         this.element = jmiObject;
         name = jmiObject.getName();
         kind = jmiObject.getKind();

@@ -39,15 +39,15 @@ import javax.swing.text.Position;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
 import org.netbeans.lib.editor.codetemplates.api.CodeTemplateManager;
+import org.netbeans.modules.csl.api.EditList;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.PreviewableFix;
+import org.netbeans.modules.csl.api.RuleContext;
+import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
-import org.netbeans.modules.gsf.api.EditList;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.PreviewableFix;
-import org.netbeans.modules.gsf.api.RuleContext;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
@@ -80,7 +80,7 @@ public class SurroundWith extends PythonSelectionRule {
 
         // Adjust the fix range to be right around the dot so that the light bulb ends up
         // on the same line as the caret and alt-enter works
-        JTextComponent target = GsfUtilities.getPaneFor(context.compilationInfo.getFileObject());
+        JTextComponent target = GsfUtilities.getPaneFor(context.parserResult.getSnapshot().getSource().getFileObject());
         if (target != null) {
             int dot = target.getCaret().getDot();
             range = new OffsetRange(dot, dot);
@@ -91,7 +91,7 @@ public class SurroundWith extends PythonSelectionRule {
         fixList.add(new SurroundWithFix(context, start, end, true, true));
         fixList.add(new SurroundWithFix(context, start, end, true, false));
         String displayName = getDisplayName();
-        Hint desc = new Hint(this, displayName, context.compilationInfo.getFileObject(),
+        Hint desc = new Hint(this, displayName, context.parserResult.getSnapshot().getSource().getFileObject(),
                 range, fixList, 1500);
         result.add(desc);
     }
@@ -250,7 +250,7 @@ public class SurroundWith extends PythonSelectionRule {
         public void implement() throws Exception {
             EditList edits = getEditList(true);
 
-            JTextComponent target = GsfUtilities.getPaneFor(context.compilationInfo.getFileObject());
+            JTextComponent target = GsfUtilities.getPaneFor(context.parserResult.getSnapshot().getSource().getFileObject());
             edits.apply();
             if (target != null) {
                 if (codeTemplateText != null && codeTemplatePos != null) {

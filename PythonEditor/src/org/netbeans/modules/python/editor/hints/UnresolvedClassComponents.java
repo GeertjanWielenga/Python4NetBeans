@@ -46,12 +46,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.prefs.Preferences;
 import javax.swing.JComponent;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.RuleContext;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.RuleContext;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.imports.ImportManager;
@@ -86,7 +85,7 @@ public class UnresolvedClassComponents extends PythonAstRule {
         return Collections.<Class>singleton(Module.class);
     }
 
-    private void populateMessages( CompilationInfo info, List<PythonTree> unresolved , List<Hint> result ,boolean isClass ) {
+    private void populateMessages( PythonParserResult info, List<PythonTree> unresolved , List<Hint> result ,boolean isClass ) {
         if (unresolved.size() > 0) {
 
             for (PythonTree node : unresolved) {
@@ -104,7 +103,7 @@ public class UnresolvedClassComponents extends PythonAstRule {
                 OffsetRange range = PythonAstUtils.getRange( node);
                 range = PythonLexerUtils.getLexerOffsets(info, range);
                 if (range != OffsetRange.NONE) {
-                    Hint desc = new Hint(this, message, info.getFileObject(), range, fixList, 2305);
+                    Hint desc = new Hint(this, message, info.getSnapshot().getSource().getFileObject(), range, fixList, 2305);
                     result.add(desc);
                 }
             }
@@ -113,9 +112,8 @@ public class UnresolvedClassComponents extends PythonAstRule {
 
 
     public void run(PythonRuleContext context, List<Hint> result) {
-        CompilationInfo info = context.compilationInfo;
-        PythonParserResult pr = PythonAstUtils.getParseResult(info);
-        SymbolTable symbolTable = pr.getSymbolTable();
+        PythonParserResult info = (PythonParserResult) context.parserResult;
+        SymbolTable symbolTable = info.getSymbolTable();
 
         List<PythonTree> unresolvedAttributes = symbolTable.getUnresolvedAttributes(info);
         populateMessages(info,unresolvedAttributes,result,false) ;
@@ -181,7 +179,7 @@ public class UnresolvedClassComponents extends PythonAstRule {
                 symbol = mod.substring(colon + 1, end).trim();
                 mod = mod.substring(0, colon).trim();
             }
-            new ImportManager(context.compilationInfo).ensureImported(mod, symbol, false, false, true);
+            new ImportManager((PythonParserResult) context.parserResult).ensureImported(mod, symbol, false, false, true);
         }
 
         public boolean isSafe() {

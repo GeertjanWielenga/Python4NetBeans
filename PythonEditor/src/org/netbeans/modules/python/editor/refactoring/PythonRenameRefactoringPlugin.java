@@ -42,7 +42,7 @@
  * made subject to such option by the copyright holder.
  */
 package org.netbeans.modules.python.editor.refactoring;
-
+/*
 import org.netbeans.modules.gsf.api.Error;
 import org.netbeans.modules.gsf.api.Severity;
 import org.netbeans.modules.python.editor.elements.Element;
@@ -99,7 +99,7 @@ import org.python.antlr.ast.ClassDef;
 import org.python.antlr.ast.FunctionDef;
 import org.python.antlr.ast.Name;
 import org.python.antlr.base.expr;
-
+*/
 /**
  * The actual Renaming refactoring work for Python.
  *
@@ -116,6 +116,7 @@ import org.python.antlr.base.expr;
  *
  * @todo Complete this. Most of the prechecks are not implemented - and the refactorings themselves need a lot of work.
  */
+/* Uncomment when it works ;-)
 public class PythonRenameRefactoringPlugin extends PythonRefactoringPlugin {
     private PythonElementCtx treePathHandle = null;
     private Collection overriddenByMethods = null; // methods that override the method to be renamed
@@ -123,7 +124,6 @@ public class PythonRenameRefactoringPlugin extends PythonRefactoringPlugin {
     private boolean doCheckName = true;
     private RenameRefactoring refactoring;
 
-    /** Creates a new instance of RenameRefactoring */
     public PythonRenameRefactoringPlugin(RenameRefactoring rename) {
         this.refactoring = rename;
         PythonElementCtx tph = rename.getRefactoringSource().lookup(PythonElementCtx.class);
@@ -352,10 +352,6 @@ public class PythonRenameRefactoringPlugin extends PythonRefactoringPlugin {
         return NbBundle.getMessage(PythonRenameRefactoringPlugin.class, key);
     }
 
-    /**
-     *
-     * @author Jan Becicka
-     */
     public class RenameTransformer extends SearchVisitor {
         private Set<PythonElementCtx> allMethods;
         private String newName;
@@ -645,14 +641,14 @@ public class PythonRenameRefactoringPlugin extends PythonRefactoringPlugin {
             Difference diff = new Difference(Difference.Kind.CHANGE, startPos, endPos, oldCode, newCode, desc);
             diffs.add(diff);
         }
-
+*/
         /**
          * @todo P1: This is matching method names on classes that have nothing to do with the class we're searching for
          *   - I've gotta filter fields, methods etc. that are not in the current class
          *  (but I also have to search for methods that are OVERRIDING the class... so I've gotta work a little harder!)
          * @todo Arity matching on the methods to preclude methods that aren't overriding or aliasing!
          */
-        private class RenameMethodVisitor extends Visitor {
+/*        private class RenameMethodVisitor extends Visitor {
             private String name;
             private PythonElementCtx searchCtx;
             private PythonElementCtx fileCtx;
@@ -683,7 +679,7 @@ public class PythonRenameRefactoringPlugin extends PythonRefactoringPlugin {
             }
         }
 
-        /** @todo Rename!*/
+        ** @todo Rename!*
         private class RenameClassVisitor extends Visitor {
             private String name;
             private PythonElementCtx searchCtx;
@@ -724,3 +720,4 @@ public class PythonRenameRefactoringPlugin extends PythonRefactoringPlugin {
         }
     }
 }
+*/

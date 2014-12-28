@@ -40,19 +40,19 @@ import javax.swing.JComponent;
 import javax.swing.text.JTextComponent;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.EditList;
+import org.netbeans.modules.csl.api.EditRegions;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.PreviewableFix;
+import org.netbeans.modules.csl.api.RuleContext;
+import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.EditList;
-import org.netbeans.modules.gsf.api.EditRegions;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.PreviewableFix;
-import org.netbeans.modules.gsf.api.RuleContext;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
 import org.netbeans.modules.python.editor.AstPath;
 import org.netbeans.modules.python.editor.PythonAstUtils;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
@@ -124,7 +124,7 @@ public class ExtractCode extends PythonSelectionRule {
 
         // Adjust the fix range to be right around the dot so that the light bulb ends up
         // on the same line as the caret and alt-enter works
-        JTextComponent target = GsfUtilities.getPaneFor(context.compilationInfo.getFileObject());
+        JTextComponent target = GsfUtilities.getPaneFor(context.parserResult.getSnapshot().getSource().getFileObject());
         if (target != null) {
             int dot = target.getCaret().getDot();
             range = new OffsetRange(dot, dot);
@@ -145,7 +145,7 @@ public class ExtractCode extends PythonSelectionRule {
         }
         if (fixList.size() > 0) {
             String displayName = getDisplayName();
-            Hint desc = new Hint(this, displayName, context.compilationInfo.getFileObject(),
+            Hint desc = new Hint(this, displayName, context.parserResult.getSnapshot().getSource().getFileObject(),
                     range, fixList, 490);
             result.add(desc);
         }
@@ -227,7 +227,7 @@ public class ExtractCode extends PythonSelectionRule {
 
         public EditList getEditList() throws Exception {
             BaseDocument doc = context.doc;
-            CompilationInfo info = context.compilationInfo;
+            PythonParserResult info = (PythonParserResult) context.parserResult;
             EditList edits = new EditList(doc);
 
             int extractedOffset = doc.getLength();
@@ -473,7 +473,7 @@ public class ExtractCode extends PythonSelectionRule {
             ranges.add(new OffsetRange(finalExtractedSiteOffset, finalExtractedSiteOffset + length));
 
             // Initiate synchronous editing:
-            EditRegions.getInstance().edit(context.compilationInfo.getFileObject(), ranges, finalExtractedSiteOffset);
+            EditRegions.getInstance().edit(context.parserResult.getSnapshot().getSource().getFileObject(), ranges, finalExtractedSiteOffset);
         }
 
         public boolean isSafe() {

@@ -32,10 +32,12 @@ package org.netbeans.modules.python.editor.elements;
 
 import java.util.Collections;
 import java.util.Set;
-import org.netbeans.modules.python.editor.lexer.PythonTokenId;
-import org.netbeans.modules.gsf.api.ElementHandle;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsf.api.Modifier;
+import org.netbeans.modules.csl.api.ElementHandle;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.csl.api.Modifier;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.openide.filesystems.FileObject;
 
 /**
@@ -43,27 +45,40 @@ import org.openide.filesystems.FileObject;
  * @author Tor Norbye
  */
 public abstract class Element implements ElementHandle {
+    @Override
     public abstract String getName();
 
+    @Override
     public abstract ElementKind getKind();
 
+    @Override
     public String getMimeType() {
-        return PythonTokenId.PYTHON_MIME_TYPE;
+        return PythonMIMEResolver.PYTHON_MIME_TYPE;
     }
 
+    @Override
     public boolean signatureEquals(ElementHandle handle) {
         // XXX TODO
         return false;
     }
 
+    @Override
+    public OffsetRange getOffsetRange(ParserResult pr) {
+        // XXX TODO
+        return null;
+    }
+
+    @Override
     public FileObject getFileObject() {
         return null;
     }
 
+    @Override
     public Set<Modifier> getModifiers() {
         return Collections.emptySet();
     }
 
+    @Override
     public String getIn() {
         return null;
     }

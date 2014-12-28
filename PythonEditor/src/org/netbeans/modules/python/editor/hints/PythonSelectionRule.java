@@ -31,7 +31,6 @@
 package org.netbeans.modules.python.editor.hints;
 
 import javax.swing.text.BadLocationException;
-import org.netbeans.modules.gsf.api.Rule.SelectionRule;
 import java.util.List;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
@@ -40,9 +39,10 @@ import org.netbeans.api.lexer.Token;
 import org.netbeans.api.lexer.TokenId;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.Rule.UserConfigurableRule;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.Rule.SelectionRule;
+import org.netbeans.modules.csl.api.Rule.UserConfigurableRule;
 import org.openide.util.Exceptions;
 import org.python.antlr.PythonTree;
 
@@ -90,7 +90,7 @@ public abstract class PythonSelectionRule implements SelectionRule, UserConfigur
             return;
         }
 
-        OffsetRange astRange = PythonAstUtils.getAstOffsets(context.compilationInfo, new OffsetRange(start, end));
+        OffsetRange astRange = PythonAstUtils.getAstOffsets(context.parserResult, new OffsetRange(start, end));
         if (astRange == OffsetRange.NONE) {
             return;
         }

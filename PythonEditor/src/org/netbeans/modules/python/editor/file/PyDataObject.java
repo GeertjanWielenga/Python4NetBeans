@@ -3,6 +3,7 @@ package org.netbeans.modules.python.editor.file;
 import java.io.IOException;
 import org.netbeans.core.spi.multiview.MultiViewElement;
 import org.netbeans.core.spi.multiview.text.MultiViewEditorElement;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.openide.awt.ActionID;
 import org.openide.awt.ActionReference;
 import org.openide.awt.ActionReferences;
@@ -21,11 +22,11 @@ import org.openide.windows.TopComponent;
 })
 @MIMEResolver.ExtensionRegistration(
         displayName = "#LBL_Py_LOADER",
-        mimeType = "text/x-python",
+        mimeType = PythonMIMEResolver.PYTHON_MIME_TYPE,
         extension = {"py"}
 )
 @DataObject.Registration(
-        mimeType = "text/x-python",
+        mimeType = PythonMIMEResolver.PYTHON_MIME_TYPE,
         iconBase = "org/netbeans/modules/python/editor/resources/pyNode25.png",
         displayName = "#LBL_Py_LOADER",
         position = 300
@@ -86,7 +87,7 @@ public class PyDataObject extends MultiDataObject {
 
     public PyDataObject(FileObject pf, MultiFileLoader loader) throws DataObjectExistsException, IOException {
         super(pf, loader);
-        registerEditor("text/x-python", true);
+        registerEditor(PythonMIMEResolver.PYTHON_MIME_TYPE, true);
     }
 
     @Override
@@ -97,7 +98,7 @@ public class PyDataObject extends MultiDataObject {
     @MultiViewElement.Registration(
             displayName = "#LBL_Py_EDITOR",
             iconBase = "org/netbeans/modules/python/editor/resources/pyNode25.png",
-            mimeType = "text/x-python",
+            mimeType = PythonMIMEResolver.PYTHON_MIME_TYPE,
             persistenceType = TopComponent.PERSISTENCE_ONLY_OPENED,
             preferredID = "Py",
             position = 1000

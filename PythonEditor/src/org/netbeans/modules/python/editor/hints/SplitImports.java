@@ -52,16 +52,16 @@ import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.EditList;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.PreviewableFix;
+import org.netbeans.modules.csl.api.RuleContext;
+import org.netbeans.modules.csl.spi.GsfUtilities;
 import org.netbeans.modules.editor.indent.api.IndentUtils;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.EditList;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.PreviewableFix;
-import org.netbeans.modules.gsf.api.RuleContext;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.options.CodeStyle;
 import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
@@ -87,7 +87,7 @@ public class SplitImports extends PythonAstRule {
         List<alias> names = imp.getInternalNames();
         if (names != null && names.size() > 1) {
             PythonTree node = context.node;
-            CompilationInfo info = context.compilationInfo;
+            PythonParserResult info = (PythonParserResult)context.parserResult;
             OffsetRange astOffsets = PythonAstUtils.getNameRange(info, node);
             OffsetRange lexOffsets = PythonLexerUtils.getLexerOffsets(info, astOffsets);
             BaseDocument doc = context.doc;
@@ -98,7 +98,7 @@ public class SplitImports extends PythonAstRule {
                     List<HintFix> fixList = new ArrayList<HintFix>();
                     fixList.add(new SplitImportsFix(context, imp));
                     String displayName = getDisplayName();
-                    Hint desc = new Hint(this, displayName, info.getFileObject(), lexOffsets, fixList, 1500);
+                    Hint desc = new Hint(this, displayName, info.getSnapshot().getSource().getFileObject(), lexOffsets, fixList, 1500);
                     result.add(desc);
                 }
             } catch (BadLocationException ex) {
@@ -163,7 +163,7 @@ public class SplitImports extends PythonAstRule {
 
             OffsetRange astRange = PythonAstUtils.getRange(imp);
             if (astRange != OffsetRange.NONE) {
-                OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(context.compilationInfo, astRange);
+                OffsetRange lexRange = PythonLexerUtils.getLexerOffsets((PythonParserResult) context.parserResult, astRange);
                 if (lexRange != OffsetRange.NONE) {
                     int indent = GsfUtilities.getLineIndent(doc, lexRange.getStart());
                     StringBuilder sb = new StringBuilder();

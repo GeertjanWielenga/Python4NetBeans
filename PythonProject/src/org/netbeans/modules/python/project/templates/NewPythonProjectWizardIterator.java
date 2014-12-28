@@ -38,7 +38,6 @@ import org.w3c.dom.Element;
 
 public class NewPythonProjectWizardIterator implements WizardDescriptor.ProgressInstantiatingIterator {    
     
-    static final String SET_AS_MAIN = "setAsMain";  //NOI18N
     static final String MAIN_FILE ="mainFile";      //NOI18N
     static final String PROP_PROJECT_NAME = "projectName";  //NOI18N
     static final String PROP_PROJECT_LOCATION = "pojectLocation";   //NOI18N

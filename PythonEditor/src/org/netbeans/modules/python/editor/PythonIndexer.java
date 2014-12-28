@@ -39,20 +39,21 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.swing.text.BadLocationException;
 import org.netbeans.editor.BaseDocument;
-import org.netbeans.modules.gsf.api.IndexDocument;
-import org.netbeans.modules.gsf.api.IndexDocumentFactory;
-import org.netbeans.modules.gsf.api.Indexer;
-import org.netbeans.modules.gsf.api.Parser.Job;
-import org.netbeans.modules.gsf.api.ParserFile;
-import org.netbeans.modules.gsf.api.ParserResult;
-import org.netbeans.modules.gsf.api.SourceFileReader;
-import org.netbeans.modules.gsf.spi.DefaultParseListener;
-import org.netbeans.modules.gsf.spi.DefaultParserFile;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.csl.spi.ParserResult;
+import org.netbeans.modules.parsing.api.Snapshot;
+import org.netbeans.modules.parsing.spi.Parser;
+import org.netbeans.modules.parsing.spi.indexing.Context;
+import org.netbeans.modules.parsing.spi.indexing.EmbeddingIndexer;
+import org.netbeans.modules.parsing.spi.indexing.Indexable;
+import org.netbeans.modules.parsing.spi.indexing.support.IndexDocument;
+import org.netbeans.modules.parsing.spi.indexing.support.IndexingSupport;
 import org.netbeans.modules.python.api.PythonPlatform;
 import org.netbeans.modules.python.api.PythonPlatformManager;
 import org.netbeans.modules.python.editor.elements.IndexedElement;
@@ -90,7 +91,9 @@ center(s, width)
  * Here I need to pick up all 3 signatures!
  * @author Tor Norbye
  */
-public class PythonIndexer implements Indexer {
+public class PythonIndexer extends EmbeddingIndexer {
+    public static final String NAME = "PythonIndexer";
+    public static final int VERSION = 1;
     public static boolean PREINDEXING = Boolean.getBoolean("gsf.preindexing"); // NOI18N
     public static final String FIELD_MEMBER = "member"; //NOI18N
     public static final String FIELD_MODULE_NAME = "module"; //NOI18N
@@ -104,13 +107,35 @@ public class PythonIndexer implements Indexer {
     private FileObject prevParent;
     private boolean prevResult;
 
-    public boolean isIndexable(ParserFile file) {
-        String extension = file.getExtension();
+    public static boolean isIndexable(Indexable indexable, Snapshot snapshot) {
+        FileObject fo = snapshot.getSource().getFileObject();
+        String extension = fo.getExt();
+        if ("py".equals(extension)) { // NOI18N
+            return true;
+        }
+
+        if ("rst".equals(extension)) { // NOI18N
+            // Index restructured text if it looks like it contains Python library
+            // definitions
+            return true;
+        }
+
+        if ("egg".equals(extension)) { // NOI18N
+            return true;
+        }
+
+        return false;
+    }
+
+    
+    public boolean isIndexable(Snapshot file) {
+        FileObject fo = file.getSource().getFileObject();
+        String extension = fo.getExt();
         if ("py".equals(extension)) { // NOI18N
 
             // Skip "test" folders under lib... Lots of weird files there
             // and we don't want to pollute the index with them
-            File parent = file.getFile().getParentFile();
+            FileObject parent = fo.getParent();
 
             if (parent != null && parent.getName().equals("test")) { // NOI18N
                 // Make sure it's really a lib folder, we want to include the
@@ -118,10 +143,6 @@ public class PythonIndexer implements Indexer {
 
                 // Avoid double-indexing files that have multiple versions - e.g. foo.js and foo-min.js
                 // or foo.uncompressed
-                FileObject fo = file.getFileObject();
-                if (fo == null) {
-                    return true;
-                }
                 FileObject parentFo = fo.getParent();
                 if (prevParent == parentFo) {
                     return prevResult;
@@ -159,22 +180,36 @@ public class PythonIndexer implements Indexer {
         return false;
     }
 
-    public List<IndexDocument> index(ParserResult result, IndexDocumentFactory factory) throws IOException {
+    @Override
+    protected void index(Indexable indexable, Parser.Result result, Context context) {
         PythonParserResult parseResult = (PythonParserResult)result;
         if (parseResult == null) {
-            return Collections.emptyList();
+            return;
         }
-        String extension = result.getFile().getNameExt();
+        
+        IndexingSupport support;
+        try {
+            support = IndexingSupport.getInstance(context);
+        } catch (IOException ioe) {
+            LOG.log(Level.WARNING, null, ioe);
+            return;
+        }
+        
+        support.removeDocuments(indexable);
+        
+        FileObject fileObject = result.getSnapshot().getSource().getFileObject();
+        String extension = fileObject.getNameExt();
 
         if (extension.endsWith(".rst")) { // NOI18N
-            return scanRst(result.getFile().getFileObject(), factory, null);
+            scanRst(fileObject, indexable, support, null);
         } else if (extension.endsWith(".egg")) { // NOI18N
-            return scanEgg(result, factory);
+            scanEgg(fileObject, indexable, parseResult, support);
         } else {
             // Normal python file
-            return new IndexTask(parseResult, factory).scan();
+            new IndexTask(parseResult, support).scan();
         }
     }
+    private static final Logger LOG = Logger.getLogger(PythonIndexer.class.getName());
 
     public boolean acceptQueryPath(String url) {
         return url.indexOf("jsstubs") == -1; // NOI18N
@@ -224,20 +259,20 @@ public class PythonIndexer implements Indexer {
 
     private static class IndexTask {
         private PythonParserResult result;
-        private ParserFile file;
-        private IndexDocumentFactory factory;
+        private FileObject file;
+        private IndexingSupport support;
         private List<IndexDocument> documents = new ArrayList<IndexDocument>();
         private String url;
         private String module;
         private SymbolTable symbolTable;
         private String overrideUrl;
 
-        private IndexTask(PythonParserResult result, IndexDocumentFactory factory) {
+        private IndexTask(PythonParserResult result, IndexingSupport support) {
             this.result = result;
-            this.file = result.getFile();
-            this.factory = factory;
+            this.file = result.getSnapshot().getSource().getFileObject();
+            this.support = support;
 
-            module = PythonUtils.getModuleName(null, file);
+            module = PythonUtils.getModuleName(file);
             //PythonTree root = PythonAstUtils.getRoot(result);
             //if (root instanceof Module) {
             //    Str moduleDoc = PythonAstUtils.getDocumentationNode(root);
@@ -247,24 +282,18 @@ public class PythonIndexer implements Indexer {
             //}
         }
 
-        private IndexTask(PythonParserResult result, IndexDocumentFactory factory, String overrideUrl) {
-            this(result, factory);
+        private IndexTask(PythonParserResult result, IndexingSupport support, String overrideUrl) {
+            this(result, support);
             this.overrideUrl = overrideUrl;
         }
 
         public List<IndexDocument> scan() {
-            FileObject fileObject = file.getFileObject();
-            try {
-                url = fileObject.getURL().toExternalForm();
-
-                // Make relative URLs for urls in the libraries
-                url = PythonIndex.getPreindexUrl(url);
-            } catch (IOException ioe) {
-                Exceptions.printStackTrace(ioe);
-            }
+            url = file.toURL().toExternalForm();
+            // Make relative URLs for urls in the libraries
+            url = PythonIndex.getPreindexUrl(url);
 
             IndexDocument doc = createDocument();
-            doc.addPair(FIELD_MODULE_NAME, module, true);
+            doc.addPair(FIELD_MODULE_NAME, module, true, true);
 
             String moduleAttrs = null;
             if (url.startsWith(PythonIndex.CLUSTER_URL) || url.startsWith(PythonIndex.PYTHONHOME_URL)) {
@@ -283,7 +312,7 @@ public class PythonIndexer implements Indexer {
                 }
             }
             if (moduleAttrs != null) {
-                doc.addPair(FIELD_MODULE_ATTR_NAME, moduleAttrs, false); // NOI18N
+                doc.addPair(FIELD_MODULE_ATTR_NAME, moduleAttrs, false, true);
             }
 
             PythonTree root = PythonAstUtils.getRoot(result);
@@ -306,7 +335,7 @@ public class PythonIndexer implements Indexer {
                     StringBuilder sig = new StringBuilder();
                     sig.append(name);
                     appendFlags(sig, 'C', sym, 0);
-                    doc.addPair(FIELD_ITEM, sig.toString(), true);
+                    doc.addPair(FIELD_ITEM, sig.toString(), true, true);
 
                     if (sym.node instanceof ClassDef) {
                         assert sym.node instanceof ClassDef : sym.node;
@@ -323,24 +352,24 @@ public class PythonIndexer implements Indexer {
                     assert sym.node instanceof FunctionDef : sym.node;
                     FunctionDef def = (FunctionDef)sym.node;
                     String sig = computeFunctionSig(name, def, sym);
-                    doc.addPair(FIELD_ITEM, sig, true);
+                    doc.addPair(FIELD_ITEM, sig, true, true);
                 } else if (sym.isImported()) {
                     if (!"*".equals(name)) { // NOI18N
                         StringBuilder sig = new StringBuilder();
                         sig.append(name);
                         appendFlags(sig, 'I', sym, 0);
-                        doc.addPair(FIELD_ITEM, sig.toString(), true);
+                        doc.addPair(FIELD_ITEM, sig.toString(), true, true);
                     }
                 } else if (sym.isGeneratorExp()) {
                     StringBuilder sig = new StringBuilder();
                     sig.append(name);
                     appendFlags(sig, 'G', sym, 0);
-                    doc.addPair(FIELD_ITEM, sig.toString(), true);
+                    doc.addPair(FIELD_ITEM, sig.toString(), true, true);
                 } else if (sym.isData()) {
                     StringBuilder sig = new StringBuilder();
                     sig.append(name);
                     appendFlags(sig, 'D', sym, 0);
-                    doc.addPair(FIELD_ITEM, sig.toString(), true);
+                    doc.addPair(FIELD_ITEM, sig.toString(), true, true);
                 } else {
                     // XXX what the heck is this??
                 }
@@ -351,7 +380,7 @@ public class PythonIndexer implements Indexer {
 
         private void indexClass(String className, SymInfo classSym, ClassDef clz) {
             IndexDocument classDocument = createDocument();
-            classDocument.addPair(FIELD_IN, module, true);
+            classDocument.addPair(FIELD_IN, module, true, true);
 
             // Superclass
             List<expr> bases = clz.getInternalBases();
@@ -359,18 +388,18 @@ public class PythonIndexer implements Indexer {
                 for (expr base : bases) {
                     String extendsName = PythonAstUtils.getExprName(base);
                     if (extendsName != null) {
-                        classDocument.addPair(FIELD_EXTENDS_NAME, extendsName, true);
+                        classDocument.addPair(FIELD_EXTENDS_NAME, extendsName, true, true);
                     }
                 }
             }
 
-            classDocument.addPair(FIELD_CLASS_NAME, className, true);
+            classDocument.addPair(FIELD_CLASS_NAME, className, true, true);
 
             if (classSym.isPrivate()) {
                 // TODO - store Documented, Deprecated, DocOnly, etc.
-                classDocument.addPair(FIELD_CLASS_ATTR_NAME, IndexedElement.encode(IndexedElement.PRIVATE), false);
+                classDocument.addPair(FIELD_CLASS_ATTR_NAME, IndexedElement.encode(IndexedElement.PRIVATE), false, true);
             }
-            classDocument.addPair(FIELD_CASE_INSENSITIVE_CLASS_NAME, className.toLowerCase(), true);
+            classDocument.addPair(FIELD_CASE_INSENSITIVE_CLASS_NAME, className.toLowerCase(), true, true);
 
             //Str doc = PythonAstUtils.getDocumentationNode(clz);
             //if (doc != null) {
@@ -397,7 +426,7 @@ public class PythonIndexer implements Indexer {
                     StringBuilder sig = new StringBuilder();
                     sig.append(name);
                     appendFlags(sig, 'C', sym, 0);
-                    classDocument.addPair(FIELD_ITEM, sig.toString(), true);
+                    classDocument.addPair(FIELD_ITEM, sig.toString(), true, true);
 
                 } else if (sym.isFunction() && sym.node instanceof FunctionDef) {
                     if (sym.node instanceof Name) {
@@ -405,17 +434,17 @@ public class PythonIndexer implements Indexer {
                     }
                     FunctionDef def = (FunctionDef)sym.node;
                     String sig = computeFunctionSig(name, def, sym);
-                    classDocument.addPair(FIELD_MEMBER, sig, true);
+                    classDocument.addPair(FIELD_MEMBER, sig, true, true);
                 } else if (sym.isData()) {
                     StringBuilder sig = new StringBuilder();
                     sig.append(name);
                     appendFlags(sig, 'D', sym, 0);
-                    classDocument.addPair(FIELD_MEMBER, sig.toString(), true);
+                    classDocument.addPair(FIELD_MEMBER, sig.toString(), true, true);
                 } else if (sym.isMember()) {
                     StringBuilder sig = new StringBuilder();
                     sig.append(name);
                     appendFlags(sig, 'A', sym, 0);
-                    classDocument.addPair(FIELD_MEMBER, sig.toString(), true);
+                    classDocument.addPair(FIELD_MEMBER, sig.toString(), true, true);
                 } else if (!sym.isBound()) {
                     continue;
                 } else {
@@ -434,7 +463,7 @@ public class PythonIndexer implements Indexer {
                         StringBuilder sig = new StringBuilder();
                         sig.append(name);
                         appendFlags(sig, 'C', sym, 0);
-                        classDocument.addPair(FIELD_ITEM, sig.toString(), true);
+                        classDocument.addPair(FIELD_ITEM, sig.toString(), true, true);
 
                     } else if (sym.isFunction() && sym.node instanceof FunctionDef) {
                         if (sym.node instanceof Name) {
@@ -442,17 +471,17 @@ public class PythonIndexer implements Indexer {
                         }
                         FunctionDef def = (FunctionDef)sym.node;
                         String sig = computeFunctionSig(name, def, sym);
-                        classDocument.addPair(FIELD_MEMBER, sig, true);
+                        classDocument.addPair(FIELD_MEMBER, sig, true, true);
                     } else if (sym.isData()) {
                         StringBuilder sig = new StringBuilder();
                         sig.append(name);
                         appendFlags(sig, 'D', sym, 0);
-                        classDocument.addPair(FIELD_MEMBER, sig.toString(), true);
+                        classDocument.addPair(FIELD_MEMBER, sig.toString(), true, true);
                     } else if (sym.isMember()) {
                         StringBuilder sig = new StringBuilder();
                         sig.append(name);
                         appendFlags(sig, 'A', sym, 0);
-                        classDocument.addPair(FIELD_MEMBER, sig.toString(), true);
+                        classDocument.addPair(FIELD_MEMBER, sig.toString(), true, true);
                     } else if (!sym.isBound()) {
                         continue;
                     } else {
@@ -466,7 +495,7 @@ public class PythonIndexer implements Indexer {
 
 // TODO - what about nested functions?
         private IndexDocument createDocument() {
-            IndexDocument doc = factory.createDocument(DEFAULT_DOC_SIZE, overrideUrl);
+            IndexDocument doc = support.createDocument(file);
             documents.add(doc);
 
             return doc;
@@ -637,11 +666,11 @@ public class PythonIndexer implements Indexer {
         }
     }
 
-    private List<IndexDocument> scanRst(FileObject fo, IndexDocumentFactory factory, String overrideUrl) {
+    private List<IndexDocument> scanRst(FileObject fo, Indexable indexable, IndexingSupport support, String overrideUrl) {
         List<CachedIndexDocument> documents = new ArrayList<CachedIndexDocument>();
 
         List<IndexDocument> docs = new ArrayList<IndexDocument>();
-
+        
         if (fo != null) {
             String module = fo.getNameExt();
             assert module.endsWith(".rst"); // NOI18N
@@ -1079,10 +1108,11 @@ public class PythonIndexer implements Indexer {
                 // because I want to modify the documents after adding documents and pairs.
                 for (CachedIndexDocument cid : documents) {
                     List<CachedIndexDocumentEntry> entries = cid.entries;
-                    IndexDocument indexedDoc = factory.createDocument(entries.size(), overrideUrl);
+                    IndexDocument indexedDoc = support.createDocument(indexable);
+//                    IndexDocument indexedDoc = support.createDocument(entries.size(), overrideUrl);
                     docs.add(indexedDoc);
                     for (CachedIndexDocumentEntry entry : entries) {
-                        indexedDoc.addPair(entry.key, entry.value, entry.index);
+                        indexedDoc.addPair(entry.key, entry.value, true, true); // XXX indexable and stored ???
                     }
                 }
             }
@@ -1274,22 +1304,19 @@ public class PythonIndexer implements Indexer {
         }
     }
 
-    private List<IndexDocument> scanEgg(ParserResult result, IndexDocumentFactory factory) {
+    private List<IndexDocument> scanEgg(FileObject fo, Indexable indexable, ParserResult result, IndexingSupport support) {
         List<IndexDocument> documents = new ArrayList<IndexDocument>();
 
-        FileObject fo = result.getFile().getFileObject();
         if (fo == null) {
             return documents;
         }
 
         try {
-            String s = fo.getURL().toExternalForm() + "!"; // NOI18N
+            String s = fo.toURL().toExternalForm() + "!"; // NOI18N
             URL u = new URL("jar:" + s); // NOI18N
             FileObject root = URLMapper.findFileObject(u);
             String rootUrl = PythonIndex.getPreindexUrl(u.toExternalForm());
-            indexScriptDocRecursively(factory, documents, root, rootUrl);
-        } catch (FileStateInvalidException ex) {
-            Exceptions.printStackTrace(ex);
+            indexScriptDocRecursively(support, documents, root, rootUrl);
         } catch (MalformedURLException ex) {
             Exceptions.printStackTrace(ex);
         }
@@ -1301,46 +1328,46 @@ public class PythonIndexer implements Indexer {
      * Method which recursively indexes directory trees, such as the yui/ folder
      * for example
      */
-    private void indexScriptDocRecursively(IndexDocumentFactory factory, List<IndexDocument> documents, final FileObject fo, String url) {
+    private void indexScriptDocRecursively(IndexingSupport support, List<IndexDocument> documents, final FileObject fo, String url) {
         if (fo.isFolder()) {
             for (FileObject c : fo.getChildren()) {
-                indexScriptDocRecursively(factory, documents, c, url + "/" + c.getNameExt()); // NOI18N
+                indexScriptDocRecursively(support, documents, c, url + "/" + c.getNameExt()); // NOI18N
             }
             return;
         }
 
         String ext = fo.getExt();
 
-        if ("py".equals(ext)) { // NOI18N
-            DefaultParseListener listener = new DefaultParseListener();
-            List<ParserFile> files = Collections.<ParserFile>singletonList(new DefaultParserFile(fo, null, false));
-            SourceFileReader reader = new SourceFileReader() {
-                public CharSequence read(ParserFile file) throws IOException {
-                    BaseDocument doc = GsfUtilities.getDocument(fo, true);
-                    if (doc != null) {
-                        try {
-                            return doc.getText(0, doc.getLength());
-                        } catch (BadLocationException ex) {
-                            Exceptions.printStackTrace(ex);
-                        }
-                    }
-
-                    return "";
-                }
-
-                public int getCaretOffset(ParserFile file) {
-                    return -1;
-                }
-            };
-            Job job = new Job(files, listener, reader, null);
-            new PythonParser().parseFiles(job);
-            ParserResult parserResult = listener.getParserResult();
-            if (parserResult != null && parserResult.isValid()) {
-                documents.addAll(new IndexTask((PythonParserResult)parserResult, factory, url).scan());
-            }
-        } else if ("rst".equals(ext)) { // NOI18N
-            documents.addAll(scanRst(fo, factory, url));
-        }
+//        if ("py".equals(ext)) { // NOI18N
+//            DefaultParseListener listener = new DefaultParseListener();
+//            List<ParserFile> files = Collections.<ParserFile>singletonList(new DefaultParserFile(fo, null, false));
+//            SourceFileReader reader = new SourceFileReader() {
+//                public CharSequence read(ParserFile file) throws IOException {
+//                    BaseDocument doc = GsfUtilities.getDocument(fo, true);
+//                    if (doc != null) {
+//                        try {
+//                            return doc.getText(0, doc.getLength());
+//                        } catch (BadLocationException ex) {
+//                            Exceptions.printStackTrace(ex);
+//                        }
+//                    }
+//
+//                    return "";
+//                }
+//
+//                public int getCaretOffset(ParserFile file) {
+//                    return -1;
+//                }
+//            };
+//            Job job = new Job(files, listener, reader, null);
+//            new PythonParser().parseFiles(job);
+//            ParserResult parserResult = listener.getParserResult();
+//            if (parserResult != null && parserResult.isValid()) {
+//                documents.addAll(new IndexTask((PythonParserResult)parserResult, support, url).scan());
+//            }
+//        } else if ("rst".equals(ext)) { // NOI18N
+//            documents.addAll(scanRst(fo, support, url));
+//        }
     }
 
     private FileObject getLibDir() {

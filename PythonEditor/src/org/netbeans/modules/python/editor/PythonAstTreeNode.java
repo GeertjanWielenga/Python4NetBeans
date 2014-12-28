@@ -30,19 +30,17 @@
  */
 package org.netbeans.modules.python.editor;
 
-import java.io.CharConversionException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
-import javax.swing.tree.TreeNode;
-import org.netbeans.modules.gsf.api.ParserResult.AstTreeNode;
-import org.openide.util.Exceptions;
-import org.openide.xml.XMLUtil;
-import org.python.antlr.PythonTree;
-import org.python.antlr.Visitor;
-import org.python.antlr.ast.Name;
-
+//import java.io.CharConversionException;
+//import java.util.ArrayList;
+//import java.util.Collections;
+//import java.util.Enumeration;
+//import java.util.List;
+//import org.openide.util.Exceptions;
+//import org.openide.xml.XMLUtil;
+//import org.python.antlr.PythonTree;
+//import org.python.antlr.Visitor;
+//import org.python.antlr.ast.Name;
+/* Unused?
 class PythonAstTreeNode implements AstTreeNode {
     private List<PythonAstTreeNode> children;
     private final PythonTree node;
@@ -179,3 +177,4 @@ class PythonAstTreeNode implements AstTreeNode {
         return null;
     }
 }
+*/

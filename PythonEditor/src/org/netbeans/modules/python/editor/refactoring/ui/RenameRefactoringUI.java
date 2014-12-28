@@ -47,9 +47,7 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import javax.swing.event.ChangeListener;
 import org.netbeans.api.fileinfo.NonRecursiveFolder;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.napi.gsfret.source.ClasspathInfo;
-import org.netbeans.napi.gsfret.source.CompilationInfo;
+import org.netbeans.modules.csl.api.ElementKind;
 import org.netbeans.modules.refactoring.api.AbstractRefactoring;
 import org.netbeans.modules.refactoring.api.RenameRefactoring;
 import org.netbeans.modules.python.editor.refactoring.PythonRefUtils;
@@ -85,17 +83,17 @@ public class RenameRefactoringUI implements RefactoringUI, RefactoringUIBypass {
     private boolean pkgRename = true;
     private String stripPrefix;
 
-    public RenameRefactoringUI(PythonElementCtx handle, CompilationInfo info) {
+    public RenameRefactoringUI(PythonElementCtx handle) {
         this.jmiObject = handle;
         stripPrefix = handle.getStripPrefix();
         this.refactoring = new RenameRefactoring(Lookups.singleton(handle));
         //oldName = handle.resolveElement(info).getSimpleName().toString();
         oldName = handle.getSimpleName();
 
-        ClasspathInfo classpath = PythonRefUtils.getClasspathInfoFor(handle);
-        if (classpath != null) {
-            refactoring.getContext().add(classpath);
-        }
+//        ClasspathInfo classpath = PythonRefUtils.getClasspathInfoFor(handle);
+//        if (classpath != null) {
+//            refactoring.getContext().add(classpath);
+//        }
 
         dispOldName = oldName;
 
@@ -105,7 +103,7 @@ public class RenameRefactoringUI implements RefactoringUI, RefactoringUIBypass {
         this.refactoring.getContext().add(UI.Constants.REQUEST_PREVIEW);
     }
 
-    public RenameRefactoringUI(FileObject file, PythonElementCtx handle, CompilationInfo info) {
+    public RenameRefactoringUI(FileObject file, PythonElementCtx handle) {
         if (handle != null) {
             jmiObject = handle;
             this.refactoring = new RenameRefactoring(Lookups.fixed(file, handle));
@@ -116,10 +114,10 @@ public class RenameRefactoringUI implements RefactoringUI, RefactoringUIBypass {
             oldName = file.getName();
         }
         dispOldName = oldName;
-        ClasspathInfo cpInfo = handle == null ? PythonRefUtils.getClasspathInfoFor(file) : PythonRefUtils.getClasspathInfoFor(handle);
-        if (cpInfo != null) {
-            refactoring.getContext().add(cpInfo);
-        }
+//        ClasspathInfo cpInfo = handle == null ? PythonRefUtils.getClasspathInfoFor(file) : PythonRefUtils.getClasspathInfoFor(handle);
+//        if (cpInfo != null) {
+//            refactoring.getContext().add(cpInfo);
+//        }
         //this(jmiObject, (FileObject) null, true);
 
         // Force refresh!
@@ -129,10 +127,10 @@ public class RenameRefactoringUI implements RefactoringUI, RefactoringUIBypass {
     public RenameRefactoringUI(NonRecursiveFolder file) {
         this.refactoring = new RenameRefactoring(Lookups.singleton(file));
         oldName = PythonRefUtils.getPackageName(file.getFolder());
-        ClasspathInfo classpath = PythonRefUtils.getClasspathInfoFor(file.getFolder());
-        if (classpath != null) {
-            refactoring.getContext().add(classpath);
-        }
+//        ClasspathInfo classpath = PythonRefUtils.getClasspathInfoFor(file.getFolder());
+//        if (classpath != null) {
+//            refactoring.getContext().add(classpath);
+//        }
         dispOldName = oldName;
         pkgRename = true;
         //this(jmiObject, (FileObject) null, true);
@@ -141,7 +139,7 @@ public class RenameRefactoringUI implements RefactoringUI, RefactoringUIBypass {
         this.refactoring.getContext().add(UI.Constants.REQUEST_PREVIEW);
     }
 
-    RenameRefactoringUI(FileObject jmiObject, String newName, PythonElementCtx handle, CompilationInfo info) {
+    RenameRefactoringUI(FileObject jmiObject, String newName, PythonElementCtx handle) {
         if (handle != null) {
             this.refactoring = new RenameRefactoring(Lookups.fixed(jmiObject, handle));
         } else {
@@ -151,10 +149,10 @@ public class RenameRefactoringUI implements RefactoringUI, RefactoringUIBypass {
         oldName = newName;
         //[FIXME] this should be oldName of refactored object
         this.dispOldName = newName;
-        ClasspathInfo cpInfo = handle == null ? PythonRefUtils.getClasspathInfoFor(jmiObject) : PythonRefUtils.getClasspathInfoFor(handle);
-        if (cpInfo != null) {
-            refactoring.getContext().add(cpInfo);
-        }
+//        ClasspathInfo cpInfo = handle == null ? PythonRefUtils.getClasspathInfoFor(jmiObject) : PythonRefUtils.getClasspathInfoFor(handle);
+//        if (cpInfo != null) {
+//            refactoring.getContext().add(cpInfo);
+//        }
         fromListener = true;
 
         // Force refresh!
@@ -163,10 +161,10 @@ public class RenameRefactoringUI implements RefactoringUI, RefactoringUIBypass {
 
     RenameRefactoringUI(NonRecursiveFolder jmiObject, String newName) {
         this.refactoring = new RenameRefactoring(Lookups.singleton(jmiObject));
-        ClasspathInfo classpath = PythonRefUtils.getClasspathInfoFor(jmiObject.getFolder());
-        if (classpath != null) {
-            refactoring.getContext().add(classpath);
-        }
+//        ClasspathInfo classpath = PythonRefUtils.getClasspathInfoFor(jmiObject.getFolder());
+//        if (classpath != null) {
+//            refactoring.getContext().add(classpath);
+//        }
         //this.jmiObject = jmiObject;
         oldName = newName;
         //[FIXME] this should be oldName of refactored object

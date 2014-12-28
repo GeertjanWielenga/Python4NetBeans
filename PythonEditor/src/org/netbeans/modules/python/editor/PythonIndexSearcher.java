@@ -31,7 +31,6 @@
 package org.netbeans.modules.python.editor;
 
 import java.awt.Toolkit;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -42,13 +41,12 @@ import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectInformation;
 import org.netbeans.api.project.ProjectUtils;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.ElementHandle;
-import org.netbeans.modules.gsf.api.Index;
-import org.netbeans.modules.gsf.api.Index.SearchScope;
-import org.netbeans.modules.gsf.api.IndexSearcher;
-import org.netbeans.modules.gsf.api.NameKind;
-import org.netbeans.modules.gsf.spi.GsfUtilities;
+import org.netbeans.modules.csl.api.ElementHandle;
+import org.netbeans.modules.csl.api.IndexSearcher;
+import org.netbeans.modules.csl.api.IndexSearcher.Descriptor;
+import org.netbeans.modules.csl.api.IndexSearcher.Helper;
+import org.netbeans.modules.csl.spi.GsfUtilities;
+import org.netbeans.modules.parsing.spi.indexing.support.QuerySupport;
 import org.openide.filesystems.FileObject;
 import org.openide.util.ImageUtilities;
 import org.python.antlr.PythonTree;
@@ -58,18 +56,20 @@ import org.python.antlr.PythonTree;
  * @author Tor Norbye
  */
 public class PythonIndexSearcher implements IndexSearcher {
-    public Set<? extends Descriptor> getTypes(Index gsfIndex, String textForQuery, NameKind kind, EnumSet<SearchScope> scope, Helper helper) {
-        PythonIndex index = PythonIndex.get(gsfIndex);
+
+    @Override
+    public Set<? extends Descriptor> getTypes(Project prjct, String textForQuery, QuerySupport.Kind kind, Helper helper) {
+        PythonIndex index = PythonIndex.get(prjct);
         Set<PythonSymbol> result = new HashSet<PythonSymbol>();
         Set<? extends IndexedElement> elements;
 
         // TODO - do some filtering if you use ./#
         //        int dot = textForQuery.lastIndexOf('.');
-        //        if (dot != -1 && (kind == NameKind.PREFIX || kind == NameKind.CASE_INSENSITIVE_PREFIX)) {
+        //        if (dot != -1 && (kind == QuerySupport.Kind.PREFIX || kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX)) {
         //            String prefix = textForQuery.substring(dot+1);
         //            String in = textForQuery.substring(0, dot);
 
-        elements = index.getClasses(textForQuery, kind, scope, null, true);
+        elements = index.getClasses(textForQuery, kind, null, true);
         for (IndexedElement element : elements) {
             result.add(new PythonSymbol(element, helper));
         }
@@ -77,22 +77,23 @@ public class PythonIndexSearcher implements IndexSearcher {
         return result;
     }
 
-    public Set<? extends Descriptor> getSymbols(Index gsfIndex, String textForQuery, NameKind kind, EnumSet<SearchScope> scope, Helper helper) {
-        PythonIndex index = PythonIndex.get(gsfIndex);
+    @Override
+    public Set<? extends Descriptor> getSymbols(Project prjct, String textForQuery, QuerySupport.Kind kind, Helper helper) {
+        PythonIndex index = PythonIndex.get(prjct);
         Set<PythonSymbol> result = new HashSet<PythonSymbol>();
         Set<? extends IndexedElement> elements;
 
         // TODO - do some filtering if you use ./#
         //        int dot = textForQuery.lastIndexOf('.');
-        //        if (dot != -1 && (kind == NameKind.PREFIX || kind == NameKind.CASE_INSENSITIVE_PREFIX)) {
+        //        if (dot != -1 && (kind == QuerySupport.Kind.PREFIX || kind == QuerySupport.Kind.CASE_INSENSITIVE_PREFIX)) {
         //            String prefix = textForQuery.substring(dot+1);
         //            String in = textForQuery.substring(0, dot);
 
-        elements = index.getAllMembers(textForQuery, kind, scope, null, true);
+        elements = index.getAllMembers(textForQuery, kind, null, true);
         for (IndexedElement element : elements) {
             result.add(new PythonSymbol(element, helper));
         }
-        elements = index.getClasses(textForQuery, kind, scope, null, true);
+        elements = index.getClasses(textForQuery, kind, null, true);
         for (IndexedElement element : elements) {
             result.add(new PythonSymbol(element, helper));
         }
@@ -187,12 +188,12 @@ public class PythonIndexSearcher implements IndexSearcher {
 
         @Override
         public void open() {
-            CompilationInfo[] infoRet = new CompilationInfo[1];
-            PythonTree node = PythonAstUtils.getForeignNode(element, infoRet);
+            PythonParserResult[] parserResultRet = new PythonParserResult[1];
+            PythonTree node = PythonAstUtils.getForeignNode(element, parserResultRet);
 
             if (node != null) {
                 int astOffset = PythonAstUtils.getRange(node).getStart();
-                int lexOffset = PythonLexerUtils.getLexerOffset(infoRet[0], astOffset);
+                int lexOffset = PythonLexerUtils.getLexerOffset(parserResultRet[0], astOffset);
                 if (lexOffset == -1) {
                     lexOffset = 0;
                 }

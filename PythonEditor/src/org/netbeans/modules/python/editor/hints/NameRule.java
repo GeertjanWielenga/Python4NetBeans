@@ -39,17 +39,17 @@ import java.util.prefs.Preferences;
 import javax.swing.JComponent;
 import org.netbeans.editor.BaseDocument;
 import org.netbeans.editor.Utilities;
+import org.netbeans.modules.csl.api.EditList;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.PreviewableFix;
+import org.netbeans.modules.csl.api.RuleContext;
 import org.netbeans.modules.python.editor.PythonAstUtils;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.PythonUtils;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.EditList;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.PreviewableFix;
-import org.netbeans.modules.gsf.api.RuleContext;
 import org.openide.util.NbBundle;
 import org.python.antlr.PythonTree;
 import org.python.antlr.ast.ClassDef;
@@ -122,7 +122,7 @@ public class NameRule extends PythonAstRule {
         PythonTree node = context.node;
         if (node instanceof Module) {
             if (moduleStyle != NO_PREFERENCE) {
-                String moduleName = PythonUtils.getModuleName(context.compilationInfo.getFileObject(), null);
+                String moduleName = PythonUtils.getModuleName(context.parserResult.getSnapshot().getSource().getFileObject());
                 if (!moduleStyle.complies(moduleName) && !moduleStyle.complies(moduleName.substring(moduleName.lastIndexOf('.') + 1))) {
                     String typeKey = "Module"; // NOI18N
                     String message = NbBundle.getMessage(NameRule.class, "WrongStyle", moduleName,
@@ -220,12 +220,13 @@ public class NameRule extends PythonAstRule {
                 }
             }
         }
-
-        CompilationInfo info = context.compilationInfo;
+        
+        PythonParserResult info = (PythonParserResult)context.parserResult;
         OffsetRange range;
         if (node instanceof Module) {
             range = new OffsetRange(0, 0);
         } else {
+            
             range = PythonAstUtils.getNameRange(info, node);
         }
         range = PythonLexerUtils.getLexerOffsets(info, range);
@@ -233,7 +234,7 @@ public class NameRule extends PythonAstRule {
             if (fixList == null) {
                 fixList = Collections.emptyList();
             }
-            Hint desc = new Hint(this, message, info.getFileObject(), range, fixList, 1500);
+            Hint desc = new Hint(this, message, info.getSnapshot().getSource().getFileObject(), range, fixList, 1500);
             result.add(desc);
         }
     }
@@ -435,8 +436,8 @@ public class NameRule extends PythonAstRule {
             BaseDocument doc = context.doc;
             EditList edits = new EditList(doc);
 
-            OffsetRange astRange = PythonAstUtils.getNameRange(context.compilationInfo, func);
-            OffsetRange lexRange = PythonLexerUtils.getLexerOffsets(context.compilationInfo, astRange);
+            OffsetRange astRange = PythonAstUtils.getNameRange((PythonParserResult) context.parserResult, func);
+            OffsetRange lexRange = PythonLexerUtils.getLexerOffsets((PythonParserResult) context.parserResult, astRange);
             if (lexRange == OffsetRange.NONE) {
                 return edits;
             }

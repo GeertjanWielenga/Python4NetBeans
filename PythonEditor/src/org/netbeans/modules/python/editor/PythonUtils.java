@@ -33,20 +33,19 @@ package org.netbeans.modules.python.editor;
 import java.util.Comparator;
 import java.util.List;
 import javax.swing.text.Document;
+import org.netbeans.api.annotations.common.NonNull;
 import org.netbeans.api.project.FileOwnerQuery;
 import org.netbeans.api.project.Project;
+import org.netbeans.api.project.ProjectUtils;
 import org.netbeans.api.project.SourceGroup;
 import org.netbeans.api.project.Sources;
 import org.netbeans.lib.editor.codetemplates.api.CodeTemplate;
 import org.netbeans.lib.editor.codetemplates.api.CodeTemplateManager;
-import org.netbeans.modules.gsf.api.ParserFile;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.api.PythonPlatform;
 import org.netbeans.modules.python.api.PythonPlatformManager;
-import org.netbeans.modules.python.editor.lexer.PythonTokenId;
 import org.openide.filesystems.FileObject;
-import org.openide.filesystems.FileStateInvalidException;
 import org.openide.filesystems.FileUtil;
-import org.openide.util.Exceptions;
 import org.openide.util.NbBundle;
 import org.python.antlr.PythonTree;
 import org.python.antlr.ast.Attribute;
@@ -59,13 +58,13 @@ import org.python.antlr.ast.Name;
 public class PythonUtils {
     public static boolean canContainPython(FileObject f) {
         String mimeType = f.getMIMEType();
-        return PythonTokenId.PYTHON_MIME_TYPE.equals(mimeType);
+        return PythonMIMEResolver.PYTHON_MIME_TYPE.equals(mimeType);
     // TODO:       "text/x-yaml".equals(mimeType) ||  // NOI18N
     // RubyInstallation.RHTML_MIME_TYPE.equals(mimeType);
     }
 
     public static boolean isPythonFile(FileObject f) {
-        return PythonTokenId.PYTHON_MIME_TYPE.equals(f.getMIMEType());
+        return PythonMIMEResolver.PYTHON_MIME_TYPE.equals(f.getMIMEType());
     }
 
     public static boolean isRstFile(FileObject f) {
@@ -75,7 +74,7 @@ public class PythonUtils {
     public static boolean isPythonDocument(Document doc) {
         String mimeType = (String)doc.getProperty("mimeType"); // NOI18N
 
-        return PythonTokenId.PYTHON_MIME_TYPE.equals(mimeType);
+        return PythonMIMEResolver.PYTHON_MIME_TYPE.equals(mimeType);
     }
     public static final String DOT__INIT__ = ".__init__"; // NOI18N
 
@@ -95,100 +94,83 @@ public class PythonUtils {
      * @param projectRelativeName If non null, the path from the project root down to this file
      * @return A string for the full package module name
      */
-    public static String getModuleName(FileObject fo, ParserFile file) {
-        assert fo != null || file != null;
+    public static String getModuleName(@NonNull FileObject fo) {
 
         // TODO - use PythonPlatform's library roots!
 
-        String module = null;
-        if (file != null) {
-            module = file.getNameExt();
-            fo = file.getFileObject();
-        } else {
-            module = fo.getName();
+        String module = fo.getName();
+
+        // First see if we're on the load path for the platform, and if so,
+        // use that as the base
+        // TODO - look up platform for the current search context instead of all platforms!!
+        if (fo.getParent() != prevParent) {
+            prevRootUrl = null;
+            prevParent = fo.getParent();
         }
 
-        if (fo != null) {
-            // First see if we're on the load path for the platform, and if so,
-            // use that as the base
-            // TODO - look up platform for the current search context instead of all platforms!!
-            try {
-                if (fo.getParent() != prevParent) {
-                    prevRootUrl = null;
-                    prevParent = fo.getParent();
-                }
+        String url = fo.toURL().toExternalForm();
+        if (prevRootUrl == null) {
+            boolean found = false;
+            PythonPlatformManager manager = PythonPlatformManager.getInstance();
 
-                String url = fo.getURL().toExternalForm();
-                if (prevRootUrl == null) {
-                    boolean found = false;
-                    PythonPlatformManager manager = PythonPlatformManager.getInstance();
-
-                    PlatformSearch:
-                    for (String name : manager.getPlatformList()) {
-                        PythonPlatform platform = manager.getPlatform(name);
-                        if (platform != null) {
-                            List<FileObject> unique = platform.getUniqueLibraryRoots();
-                            for (FileObject root : unique) {
-                                if (FileUtil.isParentOf(root, fo)) {
-                                    for (FileObject r : platform.getLibraryRoots()) {
-                                        if (FileUtil.isParentOf(r, fo)) {
-                                            // See if the folder itself contains
-                                            // an __init__.py file - if it does,
-                                            // then include the directory itself
-                                            // in the package name.
-                                            if (r.getFileObject("__init__.py") != null) { // NOI18N
-                                                r = r.getParent();
-                                            }
-
-                                            prevRootUrl = r.getURL().toExternalForm();
-                                            found = true;
-                                            break PlatformSearch;
-                                        }
-                                    }
-                                    break PlatformSearch;
-                                }
-                            }
-                        }
-                    }
-
-                    if (!found) {
-                        Project project = FileOwnerQuery.getOwner(fo);
-                        if (project != null) {
-                            Sources source = project.getLookup().lookup(Sources.class);
-                            // Look up the source path
-                            SourceGroup[] sourceGroups = source.getSourceGroups(SOURCES_TYPE_PYTHON);
-                            for (SourceGroup group : sourceGroups) {
-                                FileObject folder = group.getRootFolder();
-                                if (FileUtil.isParentOf(folder, fo)) {
+            PlatformSearch:
+            for (String name : manager.getPlatformList()) {
+                PythonPlatform platform = manager.getPlatform(name);
+                if (platform != null) {
+                    List<FileObject> unique = platform.getUniqueLibraryRoots();
+                    for (FileObject root : unique) {
+                        if (FileUtil.isParentOf(root, fo)) {
+                            for (FileObject r : platform.getLibraryRoots()) {
+                                if (FileUtil.isParentOf(r, fo)) {
                                     // See if the folder itself contains
                                     // an __init__.py file - if it does,
                                     // then include the directory itself
                                     // in the package name.
-                                    if (folder.getFileObject("__init__.py") != null) { // NOI18N
-                                        folder = folder.getParent();
+                                    if (r.getFileObject("__init__.py") != null) { // NOI18N
+                                        r = r.getParent();
                                     }
 
-                                    prevRootUrl = folder.getURL().toExternalForm();
-                                    break;
+                                    prevRootUrl = r.toURL().toExternalForm();
+                                    found = true;
+                                    break PlatformSearch;
                                 }
                             }
+                            break PlatformSearch;
                         }
                     }
                 }
-
-                if (prevRootUrl != null) {
-                    module = url.substring(prevRootUrl.length());
-                    if (module.startsWith("/")) {
-                        module = module.substring(1);
-                    }
-                } else if (file != null && file.getRelativePath() != null) {
-                    module = file.getRelativePath();
-                }
-            } catch (FileStateInvalidException ex) {
-                Exceptions.printStackTrace(ex);
             }
-        } else if (file != null && file.getRelativePath() != null) {
-            module = file.getRelativePath();
+
+            if (!found) {
+                Project project = FileOwnerQuery.getOwner(fo);
+                if (project != null) {
+                    Sources source = ProjectUtils.getSources(project);
+                    // Look up the source path
+                    SourceGroup[] sourceGroups = source.getSourceGroups(SOURCES_TYPE_PYTHON);
+                    for (SourceGroup group : sourceGroups) {
+                        FileObject folder = group.getRootFolder();
+                        if (FileUtil.isParentOf(folder, fo)) {
+                            // See if the folder itself contains
+                            // an __init__.py file - if it does,
+                            // then include the directory itself
+                            // in the package name.
+                            if (folder.getFileObject("__init__.py") != null) { // NOI18N
+                                folder = folder.getParent();
+                            }
+
+                            prevRootUrl = folder.toURL().toExternalForm();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (prevRootUrl != null) {
+            module = url.substring(prevRootUrl.length());
+            if (module.startsWith("/")) {
+                module = module.substring(1);
+            }
         }
 
         // Strip off .y extension

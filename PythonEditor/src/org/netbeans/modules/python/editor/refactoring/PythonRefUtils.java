@@ -58,9 +58,7 @@ import javax.swing.text.StyleConstants;
 import org.netbeans.api.editor.mimelookup.MimeLookup;
 import org.netbeans.api.editor.mimelookup.MimePath;
 import org.netbeans.api.editor.settings.FontColorSettings;
-import org.netbeans.modules.gsf.api.ElementKind;
-import org.netbeans.modules.gsfpath.api.classpath.ClassPath;
-import org.netbeans.modules.gsfpath.api.classpath.GlobalPathRegistry;
+import org.netbeans.api.java.classpath.ClassPath;
 import org.netbeans.api.lexer.Token;
 import org.netbeans.api.lexer.TokenHierarchy;
 import org.netbeans.api.lexer.TokenId;
@@ -70,13 +68,12 @@ import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectUtils;
 import org.netbeans.api.project.SourceGroup;
 import org.netbeans.api.project.ui.OpenProjects;
-import org.netbeans.napi.gsfret.source.ClasspathInfo;
-import org.netbeans.napi.gsfret.source.CompilationInfo;
-import org.netbeans.napi.gsfret.source.Source;
-import org.netbeans.napi.gsfret.source.SourceUtils;
 import org.netbeans.editor.BaseDocument;
-import org.netbeans.modules.gsfpath.spi.classpath.support.ClassPathSupport;
+import org.netbeans.modules.csl.api.ElementKind;
+import org.netbeans.modules.parsing.api.Source;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.netbeans.modules.python.editor.PythonAstUtils;
+import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.PythonUtils;
 import org.netbeans.modules.python.editor.lexer.PythonTokenId;
 import org.openide.cookies.EditorCookie;
@@ -103,51 +100,6 @@ public class PythonRefUtils {
     private PythonRefUtils() {
     }
 
-    // XXX Should this be unused now?
-    public static Source createSource(ClasspathInfo cpInfo, FileObject fo) {
-        if (PythonUtils.canContainPython(fo)) {
-            return Source.create(cpInfo, fo);
-        }
-
-        return null;
-    }
-
-    public static Source getSource(FileObject fo) {
-        Source source = Source.forFileObject(fo);
-
-        return source;
-    }
-
-    public static Source getSource(Document doc) {
-        Source source = Source.forDocument(doc);
-
-        return source;
-    }
-
-    public static BaseDocument getDocument(CompilationInfo info, FileObject fo) {
-        BaseDocument doc = null;
-
-        if (info != null) {
-            doc = (BaseDocument)info.getDocument();
-        }
-
-        if (doc == null) {
-            try {
-                // Gotta open it first
-                DataObject od = DataObject.find(fo);
-                EditorCookie ec = od.getCookie(EditorCookie.class);
-
-                if (ec != null) {
-                    doc = (BaseDocument)ec.openDocument();
-                }
-            } catch (IOException ex) {
-                Exceptions.printStackTrace(ex);
-            }
-        }
-
-        return doc;
-    }
-
     /** Compute the names (full and simple, e.g. Foo::Bar and Bar) for the given node, if any, and return as 
      * a String[2] = {name,simpleName} */
     public static String[] getNodeNames(PythonTree node) {
@@ -169,10 +121,10 @@ public class PythonRefUtils {
         return new String[]{name, simpleName};
     }
 
-    public static CloneableEditorSupport findCloneableEditorSupport(CompilationInfo info) {
+    public static CloneableEditorSupport findCloneableEditorSupport(PythonParserResult info) {
         DataObject dob = null;
         try {
-            dob = DataObject.find(info.getFileObject());
+            dob = DataObject.find(info.getSnapshot().getSource().getFileObject());
         } catch (DataObjectNotFoundException ex) {
             Exceptions.printStackTrace(ex);
         }
@@ -211,7 +163,7 @@ public class PythonRefUtils {
         StringBuffer buf = new StringBuffer();
         // TODO - check whether we need python highlighting or rhtml highlighting
         TokenHierarchy tokenH = TokenHierarchy.create(text, PythonTokenId.language());
-        Lookup lookup = MimeLookup.getLookup(MimePath.get(PythonTokenId.PYTHON_MIME_TYPE));
+        Lookup lookup = MimeLookup.getLookup(MimePath.get(PythonMIMEResolver.PYTHON_MIME_TYPE));
         FontColorSettings settings = lookup.lookup(FontColorSettings.class);
         @SuppressWarnings("unchecked")
         TokenSequence<? extends TokenId> tok = tokenH.tokenSequence();
@@ -341,82 +293,82 @@ public class PythonRefUtils {
         return tph.getKind();
     }
 
-    public static ClasspathInfo getClasspathInfoFor(FileObject... files) {
-        assert files.length > 0;
-        Set<URL> dependentRoots = new HashSet<URL>();
-        for (FileObject fo : files) {
-            Project p = null;
-            if (fo != null) {
-                p = FileOwnerQuery.getOwner(fo);
-            }
-            if (p != null) {
-                ClassPath classPath = ClassPath.getClassPath(fo, ClassPath.SOURCE);
-                if (classPath == null) {
-                    return null;
-                }
-                FileObject ownerRoot = classPath.findOwnerRoot(fo);
-                if (ownerRoot != null) {
-                    URL sourceRoot = URLMapper.findURL(ownerRoot, URLMapper.INTERNAL);
-                    dependentRoots.addAll(SourceUtils.getDependentRoots(sourceRoot));
-                    for (SourceGroup root : ProjectUtils.getSources(p).getSourceGroups(SOURCES_TYPE_PYTHON)) {
-                        dependentRoots.add(URLMapper.findURL(root.getRootFolder(), URLMapper.INTERNAL));
-                    }
-                } else {
-                    dependentRoots.add(URLMapper.findURL(fo.getParent(), URLMapper.INTERNAL));
-                }
-            } else {
-                for (ClassPath cp : GlobalPathRegistry.getDefault().getPaths(ClassPath.SOURCE)) {
-                    for (FileObject root : cp.getRoots()) {
-                        dependentRoots.add(URLMapper.findURL(root, URLMapper.INTERNAL));
-                    }
-                }
-            }
-        }
-
-        ClassPath rcp = ClassPathSupport.createClassPath(dependentRoots.toArray(new URL[dependentRoots.size()]));
-        ClassPath nullPath = ClassPathSupport.createClassPath(new FileObject[0]);
-        ClassPath boot = files[0] != null ? ClassPath.getClassPath(files[0], ClassPath.BOOT) : nullPath;
-        ClassPath compile = files[0] != null ? ClassPath.getClassPath(files[0], ClassPath.COMPILE) : nullPath;
-
-        if (boot == null || compile == null) { // 146499
-            return null;
-        }
-
-        ClasspathInfo cpInfo = ClasspathInfo.create(boot, compile, rcp);
-        return cpInfo;
-    }
-
-    public static ClasspathInfo getClasspathInfoFor(PythonElementCtx ctx) {
-        return getClasspathInfoFor(ctx.getFileObject());
-    }
-
-    public static List<FileObject> getPythonFilesInProject(FileObject fileInProject) {
-        List<FileObject> list = new ArrayList<FileObject>(100);
-        ClasspathInfo cpInfo = PythonRefUtils.getClasspathInfoFor(fileInProject);
-        if (cpInfo == null) {
-            return list;
-        }
-        ClassPath cp = cpInfo.getClassPath(ClasspathInfo.PathKind.SOURCE);
-        for (ClassPath.Entry entry : cp.entries()) {
-            FileObject root = entry.getRoot();
-            String name = root.getName();
-            // Skip non-refactorable parts in renaming
-            if (name.equals("vendor") || name.equals("script")) { // NOI18N
-                continue;
-            }
-            addPythonFiles(list, root);
-        }
-
-        return list;
-    }
-
-    private static void addPythonFiles(List<FileObject> list, FileObject f) {
-        if (f.isFolder()) {
-            for (FileObject child : f.getChildren()) {
-                addPythonFiles(list, child);
-            }
-        } else if (PythonUtils.canContainPython(f)) {
-            list.add(f);
-        }
-    }
+//    public static ClasspathInfo getClasspathInfoFor(FileObject... files) {
+//        assert files.length > 0;
+//        Set<URL> dependentRoots = new HashSet<URL>();
+//        for (FileObject fo : files) {
+//            Project p = null;
+//            if (fo != null) {
+//                p = FileOwnerQuery.getOwner(fo);
+//            }
+//            if (p != null) {
+//                ClassPath classPath = ClassPath.getClassPath(fo, ClassPath.SOURCE);
+//                if (classPath == null) {
+//                    return null;
+//                }
+//                FileObject ownerRoot = classPath.findOwnerRoot(fo);
+//                if (ownerRoot != null) {
+//                    URL sourceRoot = URLMapper.findURL(ownerRoot, URLMapper.INTERNAL);
+//                    dependentRoots.addAll(SourceUtils.getDependentRoots(sourceRoot));
+//                    for (SourceGroup root : ProjectUtils.getSources(p).getSourceGroups(SOURCES_TYPE_PYTHON)) {
+//                        dependentRoots.add(URLMapper.findURL(root.getRootFolder(), URLMapper.INTERNAL));
+//                    }
+//                } else {
+//                    dependentRoots.add(URLMapper.findURL(fo.getParent(), URLMapper.INTERNAL));
+//                }
+//            } else {
+//                for (ClassPath cp : GlobalPathRegistry.getDefault().getPaths(ClassPath.SOURCE)) {
+//                    for (FileObject root : cp.getRoots()) {
+//                        dependentRoots.add(URLMapper.findURL(root, URLMapper.INTERNAL));
+//                    }
+//                }
+//            }
+//        }
+//
+//        ClassPath rcp = ClassPathSupport.createClassPath(dependentRoots.toArray(new URL[dependentRoots.size()]));
+//        ClassPath nullPath = ClassPathSupport.createClassPath(new FileObject[0]);
+//        ClassPath boot = files[0] != null ? ClassPath.getClassPath(files[0], ClassPath.BOOT) : nullPath;
+//        ClassPath compile = files[0] != null ? ClassPath.getClassPath(files[0], ClassPath.COMPILE) : nullPath;
+//
+//        if (boot == null || compile == null) { // 146499
+//            return null;
+//        }
+//
+//        ClasspathInfo cpInfo = ClasspathInfo.create(boot, compile, rcp);
+//        return cpInfo;
+//    }
+//
+//    public static ClasspathInfo getClasspathInfoFor(PythonElementCtx ctx) {
+//        return getClasspathInfoFor(ctx.getFileObject());
+//    }
+//
+//    public static List<FileObject> getPythonFilesInProject(FileObject fileInProject) {
+//        List<FileObject> list = new ArrayList<FileObject>(100);
+//        ClasspathInfo cpInfo = PythonRefUtils.getClasspathInfoFor(fileInProject);
+//        if (cpInfo == null) {
+//            return list;
+//        }
+//        ClassPath cp = cpInfo.getClassPath(ClasspathInfo.PathKind.SOURCE);
+//        for (ClassPath.Entry entry : cp.entries()) {
+//            FileObject root = entry.getRoot();
+//            String name = root.getName();
+//            // Skip non-refactorable parts in renaming
+//            if (name.equals("vendor") || name.equals("script")) { // NOI18N
+//                continue;
+//            }
+//            addPythonFiles(list, root);
+//        }
+//
+//        return list;
+//    }
+//
+//    private static void addPythonFiles(List<FileObject> list, FileObject f) {
+//        if (f.isFolder()) {
+//            for (FileObject child : f.getChildren()) {
+//                addPythonFiles(list, child);
+//            }
+//        } else if (PythonUtils.canContainPython(f)) {
+//            list.add(f);
+//        }
+//    }
 }

@@ -46,12 +46,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.prefs.Preferences;
 import javax.swing.JComponent;
-import org.netbeans.modules.gsf.api.CompilationInfo;
-import org.netbeans.modules.gsf.api.Hint;
-import org.netbeans.modules.gsf.api.HintFix;
-import org.netbeans.modules.gsf.api.HintSeverity;
-import org.netbeans.modules.gsf.api.OffsetRange;
-import org.netbeans.modules.gsf.api.RuleContext;
+import org.netbeans.modules.csl.api.Hint;
+import org.netbeans.modules.csl.api.HintFix;
+import org.netbeans.modules.csl.api.HintSeverity;
+import org.netbeans.modules.csl.api.OffsetRange;
+import org.netbeans.modules.csl.api.RuleContext;
 import org.netbeans.modules.python.editor.PythonAstUtils;
 import org.netbeans.modules.python.editor.PythonParserResult;
 import org.netbeans.modules.python.editor.lexer.PythonLexerUtils;
@@ -92,13 +91,13 @@ public class AllAssignExists extends PythonAstRule {
                     SymInfo sym = topScope.tbl.get(name);
                     if (sym == null) {
                         // Uh oh -- missing!
-                        CompilationInfo info = context.compilationInfo;
+                        PythonParserResult info = (PythonParserResult) context.parserResult;
                         OffsetRange range = PythonAstUtils.getNameRange(info, str);
                         range = PythonLexerUtils.getLexerOffsets(info, range);
                         if (range != OffsetRange.NONE) {
                             List<HintFix> fixList = Collections.emptyList();
                             String message = NbBundle.getMessage(AllAssignExists.class, "AllAssignExistsMsg", name);
-                            Hint desc = new Hint(this, message, info.getFileObject(), range, fixList, 205);
+                            Hint desc = new Hint(this, message, info.getSnapshot().getSource().getFileObject(), range, fixList, 205);
                             result.add(desc);
                         }
                     }

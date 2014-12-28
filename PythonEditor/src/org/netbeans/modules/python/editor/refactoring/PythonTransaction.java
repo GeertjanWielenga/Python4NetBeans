@@ -42,18 +42,18 @@
  * made subject to such option by the copyright holder.
  */
 package org.netbeans.modules.python.editor.refactoring;
-
+/*
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import org.netbeans.napi.gsfret.source.ModificationResult;
 import org.netbeans.modules.refactoring.spi.BackupFacility;
 import org.netbeans.modules.refactoring.spi.Transaction;
-
+*/
 /**
  *
  * @author Jan Becicka
  */
+/* Probably remove completely ;-)
 public class PythonTransaction implements Transaction {
     ArrayList<BackupFacility.Handle> ids = new ArrayList<BackupFacility.Handle>();
     private boolean commited = false;
@@ -96,4 +96,4 @@ public class PythonTransaction implements Transaction {
         }
     }
 }
-            
+*/

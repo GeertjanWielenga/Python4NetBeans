@@ -77,6 +77,7 @@ import java.awt.event.ActionListener;
 import java.io.IOException;
 import javax.swing.text.StyledDocument;
 import org.netbeans.editor.EditorUI;
+import org.netbeans.modules.python.api.PythonMIMEResolver;
 import org.openide.ErrorManager;
 import org.openide.cookies.EditorCookie;
 import org.openide.text.NbDocument;
@@ -99,7 +100,7 @@ public class WatchPanel {
     }
     
     public static void setupContext(final JEditorPane editorPane, final ActionListener contextSetUp) {
-        EditorKit kit = CloneableEditorSupport.getEditorKit("text/x-python");
+        EditorKit kit = CloneableEditorSupport.getEditorKit(PythonMIMEResolver.PYTHON_MIME_TYPE);
         editorPane.setEditorKit(kit);
         DebuggerEngine en = DebuggerManager.getDebuggerManager ().getCurrentEngine();
         if (EventQueue.isDispatchThread() && en != null) {
