@@ -8,6 +8,7 @@
 /PythonProject/nbproject/private/
 /PythonQshell/nbproject/private/
 /PythonSamples/nbproject/private/
+/PythonSource/nbproject/private/
 /PythonTestrunner/nbproject/private/
 /PythonSuite/nbproject/private/
 /PythonSuite/build/
@@ -21,6 +22,7 @@
 /PythonPlatform/build/
 /PythonProject/build/
 /PythonSamples/build/
+/PythonSource/build/
 /PythonQshell/build/
 /PythonTestrunner/build/
 /PythonSuite/GSF/nbproject/private/
@@ -40,3 +42,5 @@
 /SettingsStorage/build/
 /SettingsStorage/nbproject/private/
 /PythonConsole/nbproject/private/
+/PythonSuite/PythonSource/build/
+/PythonSuite/PythonSource/nbproject/private/

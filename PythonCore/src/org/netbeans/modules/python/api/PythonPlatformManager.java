@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -397,7 +398,11 @@ public class PythonPlatformManager implements Serializable{
         }catch(PythonException ex){
             Exceptions.printStackTrace(ex);
             throw ex;
-        }catch(Exception ex){            
+        }catch(InterruptedException ex){            
+            Exceptions.printStackTrace(ex);
+        } catch (ExecutionException ex) {
+            Exceptions.printStackTrace(ex);
+        } catch (IOException ex) {
             Exceptions.printStackTrace(ex);
         }
         return platform;
