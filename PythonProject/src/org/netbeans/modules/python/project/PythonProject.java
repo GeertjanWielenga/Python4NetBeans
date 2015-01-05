@@ -2,7 +2,6 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package org.netbeans.modules.python.project;
 
 import java.beans.PropertyChangeListener;
@@ -18,9 +17,8 @@ import org.netbeans.modules.python.project.ui.customizer.PythonCustomizerProvide
 import org.netbeans.api.project.Project;
 import org.netbeans.api.project.ProjectInformation;
 import org.netbeans.api.project.ProjectManager;
-//import org.netbeans.modules.gsfpath.api.classpath.ClassPath;
-//import org.netbeans.modules.gsfpath.api.classpath.GlobalPathRegistry;
 import org.netbeans.modules.python.editor.codecoverage.PythonCoverageProvider;
+import org.netbeans.modules.python.source.queries.SourceLevelQueryImplementation;
 import org.netbeans.spi.project.AuxiliaryConfiguration;
 import org.netbeans.spi.project.support.ant.AntProjectHelper;
 import org.netbeans.spi.project.support.ant.ProjectXmlSavedHook;
@@ -49,82 +47,86 @@ import org.w3c.dom.Text;
  * @author Tomas Zezula
  */
 public class PythonProject implements Project {
-    
+
     private static final ImageIcon PROJECT_ICON = ImageUtilities.loadImageIcon("org/netbeans/modules/python/project/resources/py_25_16.png", false);
-    
+
     protected AntProjectHelper helper;
-    protected  UpdateHelper updateHelper;
-    protected  LogicalViewProvider logicalView = new PythonLogicalView(this);
-    protected  SourceRoots sourceRoots;
-    protected  SourceRoots testRoots;
-    protected  Lookup lkp;
-    protected  PropertyEvaluator evaluator;
-    protected  ReferenceHelper refHelper;
-    protected  AuxiliaryConfiguration aux;
-    
+    protected UpdateHelper updateHelper;
+    protected LogicalViewProvider logicalView = new PythonLogicalView(this);
+    protected SourceRoots sourceRoots;
+    protected SourceRoots testRoots;
+    protected Lookup lkp;
+    protected PropertyEvaluator evaluator;
+    protected ReferenceHelper refHelper;
+    protected AuxiliaryConfiguration aux;
+
     public PythonProject(final AntProjectHelper helper) {
         assert helper != null;
         this.helper = helper;
-        this.updateHelper = new UpdateHelper(UpdateImplementation.NULL,helper);
+        this.updateHelper = new UpdateHelper(UpdateImplementation.NULL, helper);
         this.evaluator = createEvaluator();
-        this.aux  = helper.createAuxiliaryConfiguration();
+        this.aux = helper.createAuxiliaryConfiguration();
         refHelper = new ReferenceHelper(helper, aux, evaluator);
         this.sourceRoots = SourceRoots.create(updateHelper, evaluator, refHelper, false);
         this.testRoots = SourceRoots.create(updateHelper, evaluator, refHelper, true);
         this.lkp = createLookup();
     }
-public PythonProject()
-{
-    
-}
+
+    public PythonProject() {
+
+    }
+
+    @Override
     public FileObject getProjectDirectory() {
         return helper.getProjectDirectory();
     }
-    
-    public PropertyEvaluator createEvaluator() {                
+
+    public PropertyEvaluator createEvaluator() {
         PropertyEvaluator privateProps = PropertyUtils.sequentialPropertyEvaluator(
                 helper.getStockPropertyPreprovider(),
                 helper.getPropertyProvider(AntProjectHelper.PRIVATE_PROPERTIES_PATH));
         return PropertyUtils.sequentialPropertyEvaluator(
-                helper.getStockPropertyPreprovider(),                
+                helper.getStockPropertyPreprovider(),
                 helper.getPropertyProvider(AntProjectHelper.PRIVATE_PROPERTIES_PATH),
                 PropertyUtils.userPropertiesProvider(privateProps,
-                    "user.properties.file", FileUtil.toFile(getProjectDirectory())), // NOI18N                
+                        "user.properties.file", FileUtil.toFile(getProjectDirectory())), // NOI18N                
                 helper.getPropertyProvider(AntProjectHelper.PROJECT_PROPERTIES_PATH));
     }
-    
-    private Lookup createLookup () {
+
+    private Lookup createLookup() {
         return Lookups.fixed(new Object[]{
-                this, //project spec requires a project be in it's own lookup
-                aux,  //Auxiliary configuartion to store bookmarks and so on
-                new PythonActionProvider(this), //Provides Standard like build and cleen
-                new ClassPathProviderImpl(this),
-                new Info(), // Project information Implementation
-                logicalView, // Logical view if project implementation
-                new PythonOpenedHook(), //Called by project framework when project is opened (closed)
-                new PythonProjectXmlSavedHook(),  //Called when project.xml changes
-                new PythonSources(this, helper,evaluator,sourceRoots,testRoots),    //Python source grops - used by package view, factories, refactoring, ...
-                new PythonProjectOperations(this),  //move, rename, copy of project
-                new RecommendedTemplatesImpl(this.updateHelper), // Recommended Templates
-                new PythonCustomizerProvider(this),     //Project custmoizer
-                new PythonProjectFileEncodingQuery(getEvaluator()),     //Provides encoding of the project - used by editor, runtime
-                new PythonSharabilityQuery(helper, getEvaluator(), getSourceRoots(), getTestRoots()),   //Sharabilit info - used by VCS
-                helper.createCacheDirectoryProvider(),  //Cache provider
-                helper.createAuxiliaryProperties(),     // AuxiliaryConfiguraion provider - used by bookmarks, project Preferences, etc
-                new PythonPlatformProvider(getEvaluator()),
-                new PythonCoverageProvider(this)
-            });
+            this, //project spec requires a project be in it's own lookup
+            aux, //Auxiliary configuartion to store bookmarks and so on
+            new PythonActionProvider(this), //Provides Standard like build and cleen
+            new ClassPathProviderImpl(this),
+            new Info(), // Project information Implementation
+            logicalView, // Logical view if project implementation
+            new PythonOpenedHook(), //Called by project framework when project is opened (closed)
+            new PythonProjectXmlSavedHook(), //Called when project.xml changes
+            new PythonSources(this, helper, evaluator, sourceRoots, testRoots), //Python source grops - used by package view, factories, refactoring, ...
+            new PythonProjectOperations(this), //move, rename, copy of project
+            new RecommendedTemplatesImpl(this.updateHelper), // Recommended Templates
+            new PythonCustomizerProvider(this), //Project custmoizer
+            new PythonProjectFileEncodingQuery(getEvaluator()), //Provides encoding of the project - used by editor, runtime
+            new PythonSharabilityQuery(helper, getEvaluator(), getSourceRoots(), getTestRoots()), //Sharabilit info - used by VCS
+            helper.createCacheDirectoryProvider(), //Cache provider
+            helper.createAuxiliaryProperties(), // AuxiliaryConfiguraion provider - used by bookmarks, project Preferences, etc
+            new PythonPlatformProvider(getEvaluator()),
+            new PythonCoverageProvider(this),
+            new PythonProjectSourceLevelQuery(evaluator, "")
+        });
     }
-    
-    public Lookup getLookup() {        
+
+    @Override
+    public Lookup getLookup() {
         return lkp;
     }
-    
-    public SourceRoots getSourceRoots () {
+
+    public SourceRoots getSourceRoots() {
         return this.sourceRoots;
     }
-    
-    public SourceRoots getTestRoots () {
+
+    public SourceRoots getTestRoots() {
         return this.testRoots;
     }
 
@@ -136,20 +138,21 @@ public PythonProject()
         return getTestRoots().getRoots();
     }
 
-    public PropertyEvaluator getEvaluator () {
+    public PropertyEvaluator getEvaluator() {
         return evaluator;
     }
-    
-    AntProjectHelper getHelper () {
+
+    AntProjectHelper getHelper() {
         return this.helper;
     }
-    
+
     public FileObject getSrcFolder() {
         return getProjectDirectory();
-    }                    
-    
-   public String getName () {
+    }
+
+    public String getName() {
         return ProjectManager.mutex().readAccess(new Mutex.Action<String>() {
+            @Override
             public String run() {
                 Element data = getHelper().getPrimaryConfigurationData(true);
                 NodeList nl = data.getElementsByTagNameNS(PythonProjectType.PROJECT_CONFIGURATION_NAMESPACE, "name"); // NOI18N
@@ -164,9 +167,10 @@ public PythonProject()
             }
         });
     }
-    
+
     void setName(final String name) {
         ProjectManager.mutex().writeAccess(new Runnable() {
+            @Override
             public void run() {
                 Element data = getHelper().getPrimaryConfigurationData(true);
                 NodeList nl = data.getElementsByTagNameNS(PythonProjectType.PROJECT_CONFIGURATION_NAMESPACE, "name"); // NOI18N
@@ -180,48 +184,56 @@ public PythonProject()
                 } else {
                     nameEl = data.getOwnerDocument().createElementNS(
                             PythonProjectType.PROJECT_CONFIGURATION_NAMESPACE, "name"); // NOI18N
-                    data.insertBefore(nameEl, /* OK if null */data.getChildNodes().item(0));
+                    data.insertBefore(nameEl, /* OK if null */ data.getChildNodes().item(0));
                 }
                 nameEl.appendChild(data.getOwnerDocument().createTextNode(name));
                 getHelper().putPrimaryConfigurationData(data, true);
             }
         });
     }
-    
-    private final class Info implements ProjectInformation{
-        
+
+    private final class Info implements ProjectInformation {
+
         private final PropertyChangeSupport propertyChangeSupport = new PropertyChangeSupport(this);
-        
-        public void addPropertyChangeListener(PropertyChangeListener  listener) {
+
+        @Override
+        public void addPropertyChangeListener(PropertyChangeListener listener) {
             propertyChangeSupport.addPropertyChangeListener(listener);
         }
-        
+
+        @Override
         public void removePropertyChangeListener(PropertyChangeListener listener) {
             propertyChangeSupport.removePropertyChangeListener(listener);
         }
 
+        @Override
         public String getDisplayName() {
             return getName();
         }
 
+        @Override
         public Icon getIcon() {
             return PROJECT_ICON;
         }
 
+        @Override
         public String getName() {
             return PythonProject.this.getName();
         }
 
+        @Override
         public Project getProject() {
             return PythonProject.this;
         }
-        
+
         void firePropertyChange(String prop) {
-            propertyChangeSupport.firePropertyChange(prop , null, null);
+            propertyChangeSupport.firePropertyChange(prop, null, null);
         }
     }
-    
+
     public final class PythonOpenedHook extends ProjectOpenedHook {
+
+        @Override
         protected void projectOpened() {
             // register project's classpaths to GlobalPathRegistry
             final ClassPathProviderImpl cpProvider = getLookup().lookup(ClassPathProviderImpl.class);
@@ -236,7 +248,8 @@ public PythonProject()
             }
         }
 
-        protected void projectClosed() {            
+        @Override
+        protected void projectClosed() {
             // unregister project's classpaths to GlobalPathRegistry
             final ClassPathProviderImpl cpProvider = getLookup().lookup(ClassPathProviderImpl.class);
             assert cpProvider != null;
@@ -249,49 +262,53 @@ public PythonProject()
             }
         }
     }
-    
+
     public final class PythonProjectXmlSavedHook extends ProjectXmlSavedHook {
-        
-       public PythonProjectXmlSavedHook() {}
-        
+
+        public PythonProjectXmlSavedHook() {
+        }
+
+        @Override
         protected void projectXmlSaved() throws IOException {
             Info info = getLookup().lookup(Info.class);
             assert info != null;
             info.firePropertyChange(ProjectInformation.PROP_NAME);
             info.firePropertyChange(ProjectInformation.PROP_DISPLAY_NAME);
-        }    
+        }
     }
+
     private static final class RecommendedTemplatesImpl implements RecommendedTemplates, PrivilegedTemplates {
-        
-        RecommendedTemplatesImpl (UpdateHelper helper) {
+
+        RecommendedTemplatesImpl(UpdateHelper helper) {
             this.helper = helper;
         }
-        
+
         private final UpdateHelper helper;
-        
+
         // List of primarily supported templates
-        
-        private static final String[] APPLICATION_TYPES = new String[] { 
-            "python",         // NOI18N
-            "XML",                  // NOI18N
-            "simple-files"          // NOI18N
+        private static final String[] APPLICATION_TYPES = new String[]{
+            "python", // NOI18N
+            "XML", // NOI18N
+            "simple-files" // NOI18N
         };
-        
-        private static final String[] PRIVILEGED_NAMES = new String[] {
+
+        private static final String[] PRIVILEGED_NAMES = new String[]{
             "Templates/Python/_package", // NOI18N
             "Templates/Python/_module.py", //NOI18N
             "Templates/Python/_main.py", // NOI18N
             "Templates/Python/_empty_module.py", // NOI18N
             "Templates/Python/_test.py", // NOI18N
         };
-        
+
+        @Override
         public String[] getRecommendedTypes() {
             return APPLICATION_TYPES;
         }
-        
+
+        @Override
         public String[] getPrivilegedTemplates() {
             return PRIVILEGED_NAMES;
         }
-        
+
     }
 }
