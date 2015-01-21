@@ -14,6 +14,12 @@ User Stories -- High Level
 
 <li>I want to be able to switch between different versions of Python and I want to see error marks and other editor features when I am using code that does not conform to the Python version I am using.</li>
 
+<li>I want to solve a bug in my code.</li>
+
+<li>I want to test my code.</li>
+
+<li>I want to see the test coverage of my code.</li>
+
 <li>I want to teach Python in the classroom, so I need easily accessible and comprehensive samples and templates.</li>
 
 </ul>
