@@ -4,7 +4,8 @@ User Stories
 
 <ul>
 
-<li></li>
-<li></li>
+<li>Open a Python file and run it.</li>
+
+<li>Group Python files together in a project.</li>
 
 </ul>
