@@ -16,6 +16,8 @@ User Stories -- High Level
 
 <li>I want to be able to add Python libraries to the classpath of a Python project.</li>
 
+<li>I want to add a new library from on-line Python repositories.</li>
+
 <li>I want to be able to switch between different versions of Python and I want to see error marks and other editor features when I am using code that does not conform to the Python version I am using.</li>
 
 <li>I want to solve a bug in my code.</li>
