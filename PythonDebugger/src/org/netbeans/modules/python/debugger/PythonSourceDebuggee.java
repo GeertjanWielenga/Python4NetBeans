@@ -40,10 +40,11 @@
  * Portions Copyrighted 2008 Sun Microsystems, Inc.
  */
 
-package org.netbeans.modules.python.debugger.spi;
+package org.netbeans.modules.python.debugger;
 
 import java.io.File ;
 import org.netbeans.modules.python.debugger.actions.JpyDbgView;
+import org.netbeans.modules.python.debugger.spi.PythonSession;
 import org.openide.filesystems.FileObject;
 
 /**

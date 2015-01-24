@@ -46,7 +46,6 @@ import java.util.Hashtable;
 import org.netbeans.modules.python.api.PythonPlatform;
 import org.netbeans.modules.python.debugger.actions.JpyDbgView;
 import org.netbeans.modules.python.debugger.spi.PythonSession;
-import org.netbeans.modules.python.debugger.spi.PythonSourceDebuggee;
 import org.openide.filesystems.FileObject;
 import org.openide.filesystems.FileUtil;
 import org.openide.loaders.DataObject;

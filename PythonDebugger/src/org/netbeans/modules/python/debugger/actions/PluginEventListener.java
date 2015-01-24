@@ -39,7 +39,10 @@
  *
  * Portions Copyrighted 2008 Sun Microsystems, Inc.
  */
-package org.netbeans.modules.python.debugger.backend;
+package org.netbeans.modules.python.debugger.actions;
+
+import org.netbeans.modules.python.debugger.backend.PluginEvent;
+import org.netbeans.modules.python.debugger.backend.PythonDebugException;
 
 /**
  *

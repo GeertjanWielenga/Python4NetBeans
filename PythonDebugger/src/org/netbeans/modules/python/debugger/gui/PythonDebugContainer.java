@@ -71,7 +71,7 @@ import org.netbeans.modules.python.debugger.PythonDebugParameters;
 import org.netbeans.modules.python.debugger.Utils;
 import org.netbeans.modules.python.debugger.backend.DebuggerContextChangeListener;
 import org.netbeans.modules.python.debugger.backend.PluginEvent;
-import org.netbeans.modules.python.debugger.backend.PluginEventListener;
+import org.netbeans.modules.python.debugger.actions.PluginEventListener;
 import org.netbeans.modules.python.debugger.backend.PythonDebugClient;
 import org.netbeans.modules.python.debugger.backend.PythonDebugEvent;
 import org.netbeans.modules.python.debugger.backend.PythonDebugEventListener;

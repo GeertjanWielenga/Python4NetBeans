@@ -62,7 +62,6 @@ import java.util.Map;
 import java.util.Set;
 import org.netbeans.modules.python.debugger.spi.PythonEvent;
 import org.netbeans.modules.python.debugger.spi.PythonSession;
-import org.netbeans.modules.python.debugger.spi.PythonSourceDebuggee;
 
 /**
  * Debugger's tasking entry point class
