@@ -344,7 +344,7 @@ public class PythonParser extends Parser {
         } catch (Throwable t) {
             runtimeException = t;
             StackTraceElement[] stackTrace = t.getStackTrace();
-            if (stackTrace != null && stackTrace.length > 0 && stackTrace[0].getClassName().equals("org.python.antlr.runtime.tree.RewriteRuleElementStream")) {
+            if (stackTrace != null && stackTrace.length > 0 && stackTrace[0].getClassName().startsWith("org.python.antlr")) {//.runtime.tree.RewriteRuleElementStream")) {
                 // This is issue 150921
                 // Don't bug user about it -- we already know
                 Logger.getLogger(this.getClass().getName()).log(Level.FINE, "Encountered issue #150921", t);
