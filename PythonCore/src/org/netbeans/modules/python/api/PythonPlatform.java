@@ -32,6 +32,7 @@ public final class PythonPlatform implements Serializable, Comparable<PythonPlat
     private String interpreterConsoleComand;
     private String interpreterArgs;
     private String homeUrl;
+    private String sourceLevel;
     private boolean dirty;
     // When adding properties, be sure to update the persistence code in PythonPlatformManager
 
@@ -70,6 +71,15 @@ public final class PythonPlatform implements Serializable, Comparable<PythonPlat
         checkDirty(this.interpreterConsoleComand, interpreterConsoleComand);
 
         this.interpreterConsoleComand = interpreterConsoleComand;
+    }
+
+    public String getSourceLevel() {
+        return sourceLevel;
+    }
+
+    public void setSourceLevel(String sourceLevel) {
+        checkDirty(this.sourceLevel, sourceLevel);
+        this.sourceLevel = sourceLevel;
     }
 
     public List<String> getJavaPath() {

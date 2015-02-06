@@ -51,6 +51,16 @@ import org.openide.windows.TopComponent;
     ),
     @ActionReference(
             path = "Loaders/text/x-python/Actions",
+            id = @ActionID(category = "Project", id = "org.netbeans.modules.project.ui.RunSingle"),
+            position = 550
+    ),
+    @ActionReference(
+            path = "Loaders/text/x.python/Actions",
+            id = @ActionID(category = "Project", id = "org.netbeans.modules.project.ui.TestSingle"),
+            position = 570
+    ),
+    @ActionReference(
+            path = "Loaders/text/x-python/Actions",
             id = @ActionID(category = "Edit", id = "org.openide.actions.DeleteAction"),
             position = 600
     ),
@@ -65,6 +75,17 @@ import org.openide.windows.TopComponent;
             id = @ActionID(category = "System", id = "org.openide.actions.SaveAsTemplateAction"),
             position = 900,
             separatorAfter = 1000
+    ),
+    @ActionReference(
+            path = "Loaders/text/x-python/Actions",
+            id = @ActionID(category = "Refactoring", id = "org.netbeans.modules.refactoring.api.ui.WhereUsedAction"),
+            position = 1050
+    ),
+    @ActionReference(
+            path = "Loaders/text/x-python/Actions",
+            id = @ActionID(category = "Refactoring", id = "RefactoringAll"),
+            position = 1090,
+            separatorAfter = 1095
     ),
     @ActionReference(
             path = "Loaders/text/x-python/Actions",

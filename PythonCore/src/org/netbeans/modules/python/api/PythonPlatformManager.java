@@ -47,6 +47,7 @@ public class PythonPlatformManager implements Serializable{
     private static final String PLATFORM_INTEPRETER = ".interpreter"; // NOI18N
     private static final String JAVA_LIB_DIR = "javalib"; // NOI18N
     private static final String PLATFORM_NAME = "name"; // NOI18N
+    private static final String SOURCE_LEVEL = "sourcelevel"; // NOI18N
     private static final String INTERPRETER_ARGS = "args"; // NOI18N
     private static final String CONSOLE_PATH = "console"; // NOI18N
     private static final String PYTHON_LIB_DIR = "pythonlib"; // NOI18N
@@ -101,7 +102,7 @@ public class PythonPlatformManager implements Serializable{
         } catch (IOException ex) {
             Exceptions.printStackTrace(ex);
         }
-        
+
         return platform;
     }
 
@@ -139,6 +140,7 @@ public class PythonPlatformManager implements Serializable{
                 String libDir = p.get(PLATFORM_PREFIX + idDot + PYTHON_LIB_DIR);
                 String javaPath = p.get(PLATFORM_PREFIX + idDot + JAVA_LIB_DIR);
                 String name = p.get(PLATFORM_PREFIX + idDot + PLATFORM_NAME);
+                String sourceLevel = p.get(PLATFORM_PREFIX + idDot + SOURCE_LEVEL);
                 String interpreterArgs = p.get(PLATFORM_PREFIX + idDot + INTERPRETER_ARGS);
                 String interpreterConsolePath = p.get(PLATFORM_PREFIX + idDot + CONSOLE_PATH);
 
@@ -154,6 +156,9 @@ public class PythonPlatformManager implements Serializable{
                 }
                 if (name != null && name.length() > 0) {
                     platform.setName(name);
+                }
+                if (sourceLevel != null && !sourceLevel.isEmpty()) {
+                    platform.setSourceLevel(sourceLevel);
                 }
                 if (libDir != null && libDir.length() > 0) {
                     platform.setPythonPath(libDir.split(File.pathSeparator));
@@ -180,7 +185,7 @@ public class PythonPlatformManager implements Serializable{
                 defaultPlatform = deflt.getId();
                 platforms.put(defaultPlatform, deflt);
             }
-            
+
             if (Util.isFirstPlatformTouch()) {
                 RequestProcessor.getDefault().post(new Runnable() {
                     public void run() {
@@ -188,7 +193,7 @@ public class PythonPlatformManager implements Serializable{
                             autoDetect();
                         }
                     }
-                });            
+                });
             }
         }
     }
@@ -216,7 +221,7 @@ public class PythonPlatformManager implements Serializable{
                     EditableProperties props = PropertyUtils.getGlobalProperties();
                     clearProperties(platform, props);
                     putPlatformProperties(platform, props);
-                    PropertyUtils.putGlobalProperties(props);                    
+                    PropertyUtils.putGlobalProperties(props);
                     return null;
                 }
             });
@@ -236,6 +241,7 @@ public class PythonPlatformManager implements Serializable{
         props.remove(PLATFORM_PREFIX + idDot + PYTHON_LIB_DIR);
         props.remove(PLATFORM_PREFIX + idDot + JAVA_LIB_DIR);
         props.remove(PLATFORM_PREFIX + idDot + PLATFORM_NAME);
+        props.remove(PLATFORM_PREFIX + idDot + SOURCE_LEVEL);
         props.remove(PLATFORM_PREFIX + idDot + INTERPRETER_ARGS);
         props.remove(PLATFORM_PREFIX + idDot + CONSOLE_PATH);
     }
@@ -263,6 +269,9 @@ public class PythonPlatformManager implements Serializable{
         String idDot = id + '.';
         if (platform.getName() != null) {
             props.setProperty(PLATFORM_PREFIX + idDot + PLATFORM_NAME, platform.getName());
+        }
+        if (platform.getSourceLevel() != null) {
+            props.setProperty(PLATFORM_PREFIX + idDot + SOURCE_LEVEL, platform.getSourceLevel());
         }
         if (platform.getInterpreterArgs() != null) {
             props.setProperty(PLATFORM_PREFIX + idDot + INTERPRETER_ARGS, platform.getInterpreterArgs());
@@ -340,16 +349,21 @@ public class PythonPlatformManager implements Serializable{
 
         firePlatformsChanged();
     }
-    
+
     public PythonPlatform findPlatformProperties(String cmd, String id) throws PythonException{
         PythonPlatform platform = null;
         try{
             PythonExecution pye = new PythonExecution();
-            pye.setCommand(cmd);
+            int split = cmd.indexOf(" ");
+            pye.setCommand(split > 0 ? cmd.substring(0, split) : cmd);
             pye.setDisplayName("Python Properties");
             File info = InstalledFileLocator.getDefault().locate(
                  "platform_info.py", "org.netbeans.modules.python.core", false);
             pye.setScript(info.getAbsolutePath());
+            if(split > 0) { 
+                String cmdArgs = cmd.substring(split).trim();
+                pye.setCommandArgs(cmdArgs);
+            }
             pye.setShowControls(false);
             pye.setShowInput(false);
             pye.setShowWindow(false);
@@ -379,6 +393,7 @@ public class PythonPlatformManager implements Serializable{
                 platform.setInterpreterConsoleComand(command);
                 // @@@Jean-Yves end of fix
                 platform.setName(name);
+                platform.setSourceLevel(prop.getProperty("platform.sourcelevel"));
                 String pathString = prop.getProperty("python.path");
                 if(pathString != null)
                     platform.setPythonPath(pathString.split(File.pathSeparator));
@@ -490,7 +505,7 @@ public class PythonPlatformManager implements Serializable{
         }
 
     }
-    
+
     private ArrayList<String> discoverJythonClasspath(String command){
         ArrayList<String> temp = new ArrayList<String>();
         //@@@jean-yves in some case bin is not there(jython 2.2.1 installer)

@@ -28,7 +28,7 @@ import org.openide.util.Exceptions;
  * @author Allan Davis
  * @author Jean-Yves
  */
-public class PythonExecution {
+public final class PythonExecution {
     // execution commands
     private String command;
     private String workingDirectory;

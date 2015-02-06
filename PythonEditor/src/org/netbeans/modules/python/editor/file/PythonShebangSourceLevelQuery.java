@@ -3,15 +3,12 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package org.netbeans.modules.python.project.queries;
+package org.netbeans.modules.python.editor.file;
 
 import org.netbeans.modules.python.source.queries.SourceLevelQueryImplementation;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Scanner;
-import java.util.Set;
-import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 import org.openide.filesystems.FileAttributeEvent;
 import org.openide.filesystems.FileChangeListener;
@@ -31,7 +28,10 @@ public class PythonShebangSourceLevelQuery implements SourceLevelQueryImplementa
 
     @Override
     public Result getSourceLevel(FileObject pythonFile) {
-        return new ResultImpl(pythonFile);
+        if(!pythonFile.isFolder()) {
+            return new ResultImpl(pythonFile);
+        }
+        return null;
     }
 
     private final static class ResultImpl implements Result, FileChangeListener {
