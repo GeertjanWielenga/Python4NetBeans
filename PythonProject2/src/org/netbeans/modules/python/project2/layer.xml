@@ -29,4 +29,11 @@
             </folder>
         </folder>
     </folder>
+    <folder name="Templates">
+        <folder name="Project">
+            <folder name="Python">
+                <attr name="position" intvalue="1412"/>
+            </folder>
+        </folder>
+    </folder>
 </filesystem>

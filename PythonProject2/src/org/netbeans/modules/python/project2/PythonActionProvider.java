@@ -70,6 +70,7 @@ public class PythonActionProvider implements ActionProvider {
             command.invokeAction(context);
         } else {
             RequestProcessor.getDefault().post(new Runnable() {
+                @Override
                 public void run() {
                     command.invokeAction(context);
                 }

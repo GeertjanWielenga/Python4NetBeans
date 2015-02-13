@@ -43,6 +43,7 @@ final class MainModuleChooser extends javax.swing.JPanel {
         this.okButton.setEnabled(false);
         ((DefaultListModel)this.mainModules.getModel()).addElement(NbBundle.getMessage(MainModuleChooser.class, "TXT_PleaseWait"));
         RP.post(new Runnable() {
+            @Override
             public void run() {
                 initData();
             }
@@ -67,6 +68,7 @@ final class MainModuleChooser extends javax.swing.JPanel {
             }
         }
         SwingUtilities.invokeLater(new Runnable() {
+            @Override
             public void run() {
                 DefaultListModel lm = (DefaultListModel)mainModules.getModel();
                 lm.clear();

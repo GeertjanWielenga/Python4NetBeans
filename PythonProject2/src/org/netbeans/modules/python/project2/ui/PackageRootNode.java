@@ -114,6 +114,7 @@ final class PackageRootNode extends AbstractNode implements Runnable, FileStatus
     private final FileObject file;
     private final Set<FileObject> files;
     private FileStatusListener fileSystemListener;
+    private static final RequestProcessor RP = new RequestProcessor(PackageRootNode.class);
     private RequestProcessor.Task task;
     private volatile boolean iconChange;
     private volatile boolean nameChange;
@@ -199,7 +200,7 @@ final class PackageRootNode extends AbstractNode implements Runnable, FileStatus
     @Override
     public void annotationChanged(FileStatusEvent event) {
         if (task == null) {
-            task = RequestProcessor.getDefault().create(this);
+            task = RP.create(this);
         }
 
         if ((iconChange == false && event.isIconChange())  || (nameChange == false && event.isNameChange())) {

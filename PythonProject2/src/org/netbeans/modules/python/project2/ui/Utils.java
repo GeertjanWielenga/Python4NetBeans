@@ -86,6 +86,7 @@ public class Utils {
             delegate = HtmlRenderer.createRenderer();
         }
 
+        @Override
         public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
             String name;
             if (value instanceof PythonPlatform) {
@@ -112,10 +113,12 @@ public class Utils {
             super (data,new Object[]{"location","label"});//NOI18N
         }
 
+        @Override
         public boolean isCellEditable(int row, int column) {
             return column == 1;
         }
 
+        @Override
         public Class getColumnClass(int columnIndex) {
             switch (columnIndex) {
                 case 0:
@@ -136,6 +139,7 @@ public class Utils {
             this.projectFolder = projectFolder;
         }
 
+        @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,int row, int column) {
             String displayName;
             if (value instanceof File) {

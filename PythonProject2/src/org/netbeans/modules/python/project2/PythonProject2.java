@@ -18,6 +18,7 @@ import org.netbeans.modules.python.api.PythonExecution;
 import org.netbeans.modules.python.api.PythonPlatform;
 import org.netbeans.modules.python.api.PythonPlatformManager;
 import org.netbeans.modules.python.editor.codecoverage.PythonCoverageProvider;
+import org.netbeans.modules.python.project2.classpath.ClassPathProviderImpl;
 import org.netbeans.modules.python.project2.ui.customizer.PythonCustomizerProvider;
 import org.netbeans.spi.project.AuxiliaryConfiguration;
 import org.netbeans.spi.project.ProjectState;
@@ -69,6 +70,7 @@ public class PythonProject2 implements Project {
     protected LogicalViewProvider logicalView;
     private final Info info;
     private final PropertyChangeSupport support;
+    private final PythonSources sources;
 
     public PythonProject2(FileObject projectDirectory, ProjectState state) {
         support = new PropertyChangeSupport(this);
@@ -76,6 +78,7 @@ public class PythonProject2 implements Project {
         this.projectDirectory = projectDirectory;
         info = new PythonProject2.Info();
         aux = new PythonAuxilaryConfig(projectDirectory, true);
+        sources = new PythonSources(this);
         this.lkp = createLookup(state);
     }
 
@@ -95,10 +98,10 @@ public class PythonProject2 implements Project {
             aux, //Auxiliary configuartion to store bookmarks and so on
             new PythonActionProvider(this), //Provides Standard like build and cleen
             info, // Project information Implementation
-//            new ClassPathProviderImpl(this),
             logicalView, // Logical view if project implementation
             new PythonProject2.PythonOpenedHook(), //Called by project framework when project is opened (closed)
-            new PythonSources(this), //Python source grops - used by package view, factories, refactoring, ...
+            sources, //Python source grops - used by package view, factories, refactoring, ...
+            new ClassPathProviderImpl(this, sources),
 //            new PythonProjectOperations(this), //move, rename, copy of project
 //            new PythonProject.RecommendedTemplatesImpl(this.updateHelper), // Recommended Templates
             new PythonCustomizerProvider(this), //Project custmoizer
