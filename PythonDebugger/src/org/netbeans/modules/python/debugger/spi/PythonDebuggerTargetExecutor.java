@@ -41,6 +41,7 @@
  */
 package org.netbeans.modules.python.debugger.spi;
 
+import org.netbeans.modules.python.debugger.PythonSourceDebuggee;
 import org.openide.execution.ExecutorTask;
 import java.io.IOException;
 import java.io.OutputStream;

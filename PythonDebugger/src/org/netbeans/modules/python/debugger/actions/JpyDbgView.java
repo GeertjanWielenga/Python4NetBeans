@@ -47,7 +47,6 @@ import org.netbeans.modules.python.debugger.DebuggerPythonLogger;
 import org.netbeans.modules.python.debugger.PythonDebugger;
 import org.netbeans.modules.python.debugger.Utils;
 import org.netbeans.modules.python.debugger.backend.PluginEvent;
-import org.netbeans.modules.python.debugger.backend.PluginEventListener;
 import org.netbeans.modules.python.debugger.breakpoints.PythonBreakpoint;
 import org.netbeans.modules.python.debugger.config.NetBeansFrontend;
 import org.netbeans.modules.python.debugger.spi.PythonEvent;

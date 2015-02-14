@@ -41,6 +41,7 @@
  */
 package org.netbeans.modules.python.debugger.spi;
 
+import org.netbeans.modules.python.debugger.PythonSourceDebuggee;
 import org.openide.windows.InputOutput;
 import org.openide.execution.ExecutorTask;
 import org.openide.windows.IOProvider;

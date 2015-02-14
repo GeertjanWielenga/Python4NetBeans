@@ -56,7 +56,6 @@ import org.netbeans.modules.python.debugger.backend.DebuggerContextChangeListene
 import org.netbeans.modules.python.debugger.backend.PluginEvent;
 import org.netbeans.modules.python.debugger.spi.PythonEvent;
 import org.netbeans.modules.python.debugger.spi.PythonSession;
-import org.netbeans.modules.python.debugger.spi.PythonSourceDebuggee;
 import org.netbeans.modules.python.debugger.spi.SessionsModel;
 import org.netbeans.modules.python.debugger.gui.PythonDebugContainer;
 import org.netbeans.modules.python.debugger.gui.PythonVariableTreeDataNode;
