@@ -17,6 +17,7 @@ public final class OptionsOptionsCategory extends OptionsCategory {
         return ImageUtilities.loadImageIcon("org/netbeans/modules/python/options/py_25_32.png", false);
     }
 
+    @Override
     public String getCategoryName() {
         return NbBundle.getMessage(OptionsOptionsCategory.class, "OptionsCategory_Name_Options");
     }

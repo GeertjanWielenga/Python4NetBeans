@@ -11,10 +11,12 @@ import org.openide.util.actions.CallableSystemAction;
 
 public final class PythonManagerAction extends CallableSystemAction {
 
+    @Override
     public void performAction() {
         PythonPlatformPanel.showPlatformManager();
     }
 
+    @Override
     public String getName() {
         return NbBundle.getMessage(PythonManagerAction.class, "CTL_PythonManagerAction");
     }
@@ -26,6 +28,7 @@ public final class PythonManagerAction extends CallableSystemAction {
         putValue("noIconInMenu", Boolean.TRUE);
     }
 
+    @Override
     public HelpCtx getHelpCtx() {
         return HelpCtx.DEFAULT_HELP;
     }
