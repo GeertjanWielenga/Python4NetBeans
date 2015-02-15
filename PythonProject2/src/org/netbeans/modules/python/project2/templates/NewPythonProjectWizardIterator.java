@@ -50,7 +50,7 @@ public class NewPythonProjectWizardIterator implements WizardDescriptor.Progress
         this.wizardType = wizardType;
     }
 
-    @TemplateRegistration(folder = "Project/Python", position = 152, displayName = "org.netbeans.modules.python.project2.Bundle#Templates/Project/Python/PythonProject2.xml", iconBase = "org/netbeans/modules/python/project2/resources/py_25_16.png", description = "/org/netbeans/modules/python/project2/templates/EmptyPythonProjectDescription.html")
+    @TemplateRegistration(folder = "Project/Python", position = 148, displayName = "org.netbeans.modules.python.project2.Bundle#Templates/Project/Python/PythonProject2.xml", iconBase = "org/netbeans/modules/python/project2/resources/py_25_16.png", description = "/org/netbeans/modules/python/project2/templates/EmptyPythonProjectDescription.html")
     public static NewPythonProjectWizardIterator createApplication() {
         return new NewPythonProjectWizardIterator();
     }
